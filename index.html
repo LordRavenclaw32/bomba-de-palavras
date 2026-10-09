@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bomba de Palavras - Avaliação de Fluência</title>
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Bomba de Palavras">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Poppins:wght@400;700;900&display=swap');
+        body { background-color: #0f172a; overflow: hidden; touch-action: manipulation; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; }
+        .font-tech { font-family: 'Orbitron', sans-serif; }
+        .glass-panel { background: linear-gradient(135deg, rgba(30,41,59,0.8) 0%, rgba(15,23,42,0.9) 100%); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+        .btn-primary { background: linear-gradient(to bottom, #3b82f6, #2563eb); box-shadow: 0 6px 0 #1e40af, 0 10px 20px rgba(0,0,0,0.4); }
+        .btn-primary:active { transform: translateY(6px); box-shadow: 0 0 0 #1e40af, 0 2px 5px rgba(0,0,0,0.4); }
+        .btn-success { background: linear-gradient(to bottom, #22c55e, #16a34a); box-shadow: 0 6px 0 #14532d, 0 10px 20px rgba(0,0,0,0.4); }
+        .btn-success:active { transform: translateY(6px); box-shadow: 0 0 0 #14532d, 0 2px 5px rgba(0,0,0,0.4); }
+        .btn-danger { background: linear-gradient(to bottom, #ef4444, #dc2626); box-shadow: 0 6px 0 #7f1d1d, 0 10px 20px rgba(0,0,0,0.4); }
+        .btn-danger:active { transform: translateY(6px); box-shadow: 0 0 0 #7f1d1d, 0 2px 5px rgba(0,0,0,0.4); }
+        @keyframes bgPan { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .bg-animated { background: linear-gradient(-45deg, #0f172a, #1e1b4b, #31111d, #0f172a); background-size: 400% 400%; animation: bgPan 15s ease infinite; }
+        #fxCanvas { pointer-events: none; z-index: 9999; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); } ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        /* Durante a leitura: texto apenas rola, sem interação nas palavras */
+        #text-reading-area { -webkit-tap-highlight-color: transparent; }
+        #text-reading-area .word-span { cursor: default; transition: background-color 0.15s, color 0.15s; padding: 2px 4px; border-radius: 4px; display: inline-block; pointer-events: none; }
+        /* No modo marcação o alvo de toque cresce, facilitando o acerto no celular */
+        #text-reading-area.marking { touch-action: pan-y; }
+        #text-reading-area.marking .word-span { padding: 8px 6px; margin: 2px 0; }
+        /* Feedback imediato ao encostar o dedo */
+        #text-reading-area.marking .word-span.tapping { background-color: rgba(59, 130, 246, 0.85); color: #fff; }
+        /* Após o tempo esgotar: container ganha .marking e as palavras ficam clicáveis */
+        #text-reading-area.marking .word-span { cursor: pointer; pointer-events: auto; }
+        @media (hover: hover) { #text-reading-area.marking .word-span:hover { background-color: rgba(59, 130, 246, 0.5); } }
+        .word-span.word-done { background-color: rgba(16, 185, 129, 0.25); color: #6ee7b7; }
+        .word-span.word-last { background-color: #f97316; color: #fff; font-weight: 900; }
+        .word-num { font-size: 0.55em; color: #64748b; font-weight: 700; margin-right: 2px; vertical-align: super; }
+        .word-span.word-done .word-num { color: #34d399; }
+        .word-span.word-last .word-num { color: #fed7aa; }
+    </style>
+</head>
+<body class="text-white selection:bg-orange-500">
+<canvas id="fxCanvas" class="absolute inset-0 w-full h-full"></canvas>
+
+<!-- Ocultos para Relatório PDF -->
+<div style="display:none;">
+    <canvas id="c1" width="1000" height="420"></canvas>
+    <canvas id="c2" width="1000" height="420"></canvas>
+    <canvas id="c3" width="1000" height="420"></canvas>
+    <canvas id="cStudent" width="1000" height="420"></canvas>
+    <canvas id="cPpm" width="1000" height="420"></canvas>
+    <canvas id="cPpmPS" width="1000" height="420"></canvas>
+    <canvas id="cPpmPC" width="1000" height="420"></canvas>
+</div>
+<input type="file" id="file-restore" class="hidden" accept=".json" onchange="restoreBackup(event)">
+
+<div id="app" class="relative w-full h-[100dvh] max-w-md mx-auto shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden bg-slate-900 border-x border-slate-800 flex flex-col">
+    
+    <!-- TELA INICIAL -->
+    <div id="screen-home" class="game-screen flex flex-col w-full h-full absolute top-0 left-0 justify-between items-center p-6 bg-animated z-20">
+        <div class="mt-12 text-center w-full">
+            <h1 id="home-title" class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-orange-500 to-red-600 drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)] transform -rotate-3 tracking-tighter title-anim leading-none">
+                BOMBA DE<br>PALAVRAS
+            </h1>
+            <p id="home-sub" class="text-sm tracking-widest uppercase text-emerald-400 mt-4 font-bold">Fluência Ledora - CAED</p>
+            <div class="mt-6 w-full h-32 relative flex justify-center items-center">
+                <canvas id="miniBombCanvas" width="150" height="120"></canvas>
+            </div>
+        </div>
+        <div id="home-actions" class="w-full flex flex-col gap-4 mb-6">
+            <button onclick="nav('student-select')" class="w-full py-5 text-2xl font-black btn-success rounded-2xl transition-transform uppercase tracking-wider shadow-lg">Iniciar Avaliação</button>
+            <div class="flex gap-3">
+                <button onclick="nav('settings', loadSettingsUI)" class="flex-1 py-3 text-sm font-bold bg-slate-800 hover:bg-slate-700 rounded-xl transition-all border border-slate-600">Ajustes</button>
+                <button onclick="nav('reports', renderReports)" class="flex-1 py-3 text-sm font-bold btn-primary rounded-xl transition-transform shadow-lg">Relatórios</button>
+            </div>
+        </div>
+        <footer id="home-foot" class="absolute bottom-3 text-[9px] text-slate-400 tracking-widest font-bold z-10 text-center w-full">A.R.S. HTML GAMES E APPS PEDAGÓGICOS</footer>
+    </div>
+
+    <!-- TELA SELEÇÃO DE ALUNO -->
+    <div id="screen-student-select" class="game-screen hidden flex-col w-full h-full absolute top-0 left-0 bg-slate-900 p-6 z-30">
+        <h2 class="text-3xl font-black text-emerald-400 mb-6 text-center uppercase tracking-widest">Quem está lendo?</h2>
+        <div class="flex-1 overflow-y-auto space-y-2 pr-2" id="student-select-list"></div>
+        <button onclick="nav('home')" class="w-full py-4 mt-4 text-lg font-bold bg-slate-800 hover:bg-slate-700 rounded-xl transition-all uppercase tracking-widest shrink-0">Voltar</button>
+    </div>
+
+    <!-- TELA ESCOLHA DE MODO -->
+    <div id="screen-mode" class="game-screen hidden flex-col w-full h-full absolute top-0 left-0 bg-slate-900 p-6 z-30 justify-center">
+        <h2 class="text-3xl font-black text-white mb-2 text-center uppercase tracking-widest drop-shadow-md">Modo de Jogo</h2>
+        <p class="text-center text-emerald-400 font-bold mb-6 uppercase" id="lbl-current-student">ALUNO</p>
+        
+        <div class="w-full space-y-4 overflow-y-auto pr-2 pb-4">
+            <div class="w-full glass-panel p-5 rounded-2xl border-2 border-blue-500/50">
+                <h3 class="text-xl font-black text-blue-400 mb-1">PALAVRAS SIMPLES</h3>
+                <p class="text-slate-300 text-[11px] font-bold mb-3">Leitura de palavras frequentes.</p>
+                <button onclick="initGame('palavras_simples', 62)" class="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow uppercase">Iniciar (62s)</button>
+            </div>
+
+            <div class="w-full glass-panel p-5 rounded-2xl border-2 border-purple-500/50">
+                <h3 class="text-xl font-black text-purple-400 mb-1">PALAVRAS COMPLEXAS</h3>
+                <p class="text-slate-300 text-[11px] font-bold mb-3">Palavras menos conhecidas/sílabas complexas.</p>
+                <button onclick="initGame('palavras_complexas', 62)" class="w-full py-3 bg-purple-600 hover:bg-purple-500 rounded-lg font-bold text-white shadow uppercase">Iniciar (62s)</button>
+            </div>
+
+            <div class="w-full glass-panel p-5 rounded-2xl border-2 border-orange-500/50">
+                <h3 class="text-xl font-black text-orange-400 mb-1">TEXTO CORRIDO</h3>
+                <p class="text-slate-300 text-[11px] font-bold mb-3">Leitura contínua. Marque a última palavra lida.</p>
+                <button onclick="initGame('texto', appData.settings.textTime)" class="w-full py-3 bg-orange-600 hover:bg-orange-500 rounded-lg font-bold text-white shadow uppercase">Iniciar (<span id="lbl-text-time"></span>s)</button>
+            </div>
+        </div>
+        <button onclick="nav('student-select')" class="mt-4 py-3 px-8 text-sm font-bold bg-slate-800 rounded-xl text-slate-300 shrink-0">Trocar Aluno</button>
+    </div>
+
+    <!-- TELA DE CONFIGURAÇÕES -->
+    <div id="screen-settings" class="game-screen hidden flex-col w-full h-full absolute top-0 left-0 bg-slate-900 p-4 z-40">
+        <h2 class="text-xl font-black text-white mb-4 text-center uppercase tracking-widest">Painel do Professor</h2>
+        
+        <div class="flex bg-slate-800 rounded-lg p-1 mb-4 shrink-0 text-[11px]">
+            <button onclick="switchTab('tab-sistema')" id="btn-tab-sistema" class="flex-1 py-2 font-bold rounded bg-blue-600 text-white shadow">Geral</button>
+            <button onclick="switchTab('tab-alunos')" id="btn-tab-alunos" class="flex-1 py-2 font-bold rounded text-slate-400">Alunos</button>
+            <button onclick="switchTab('tab-palavras')" id="btn-tab-palavras" class="flex-1 py-2 font-bold rounded text-slate-400">Palavras</button>
+            <button onclick="switchTab('tab-texto')" id="btn-tab-texto" class="flex-1 py-2 font-bold rounded text-slate-400">Texto</button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto pb-4">
+            <div id="tab-sistema" class="tab-content block space-y-4">
+                <div class="glass-panel p-4 rounded-xl space-y-3">
+                    <label class="block text-sm font-bold text-emerald-300 border-b border-slate-700 pb-1">Dados para Relatório</label>
+                    <input type="text" id="cfg-teacher" placeholder="Nome do Professor(a)" class="w-full bg-slate-900 text-white rounded p-2 border border-slate-600 text-sm">
+                    <input type="text" id="cfg-school" placeholder="Escola e Turma (Ex: E.M. Brasil - 3ºA)" class="w-full bg-slate-900 text-white rounded p-2 border border-slate-600 text-sm">
+                </div>
+                <div class="glass-panel p-4 rounded-xl space-y-4 text-sm">
+                    <label class="block text-sm font-bold text-emerald-300 border-b border-slate-700 pb-1">Preferências</label>
+                    <label class="flex justify-between items-center"><span class="font-bold">Modo Tela Cheia</span><input type="checkbox" id="cfg-fs" class="w-5 h-5 accent-blue-500"></label>
+                    <label class="flex justify-between items-center"><span class="font-bold">Som Pavio Queimando</span><input type="checkbox" id="cfg-snd-f" class="w-5 h-5 accent-orange-500"></label>
+                    <label class="flex justify-between items-center"><span class="font-bold">Efeitos Sonoros</span><input type="checkbox" id="cfg-snd-e" class="w-5 h-5 accent-red-500"></label>
+                </div>
+                <div class="glass-panel p-4 rounded-xl space-y-3 text-sm">
+                    <label class="block text-sm font-bold text-cyan-300 border-b border-slate-700 pb-1">Faixas de Fluência (PPM)</label>
+                    <p class="text-[10px] text-slate-400 leading-snug">Limites de classificação por modo. Cada modo tem sua própria referência, pois o número de palavras lidas varia com a dificuldade.</p>
+
+                    <div class="space-y-1">
+                        <span class="text-[11px] font-black text-blue-400 uppercase">Palavras Simples</span>
+                        <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
+                            <div><label class="block text-orange-300 font-bold mb-1">Inic. ≥</label><input type="number" id="cfg-band-ps-ini" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
+                            <div><label class="block text-yellow-300 font-bold mb-1">Desenv. ≥</label><input type="number" id="cfg-band-ps-dev" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
+                            <div><label class="block text-green-300 font-bold mb-1">Fluente ≥</label><input type="number" id="cfg-band-ps-flu" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        <span class="text-[11px] font-black text-purple-400 uppercase">Palavras Complexas</span>
+                        <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
+                            <div><label class="block text-orange-300 font-bold mb-1">Inic. ≥</label><input type="number" id="cfg-band-pc-ini" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
+                            <div><label class="block text-yellow-300 font-bold mb-1">Desenv. ≥</label><input type="number" id="cfg-band-pc-dev" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
+                            <div><label class="block text-green-300 font-bold mb-1">Fluente ≥</label><input type="number" id="cfg-band-pc-flu" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        <span class="text-[11px] font-black text-orange-400 uppercase">Texto Corrido</span>
+                        <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
+                            <div><label class="block text-orange-300 font-bold mb-1">Inic. ≥</label><input type="number" id="cfg-band-tx-ini" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
+                            <div><label class="block text-yellow-300 font-bold mb-1">Desenv. ≥</label><input type="number" id="cfg-band-tx-dev" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
+                            <div><label class="block text-green-300 font-bold mb-1">Fluente ≥</label><input type="number" id="cfg-band-tx-flu" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="downloadBackup()" class="flex-1 py-3 bg-purple-600 rounded-xl font-bold text-xs uppercase shadow">Baixar Backup</button>
+                    <button onclick="document.getElementById('file-restore').click()" class="flex-1 py-3 bg-teal-600 rounded-xl font-bold text-xs uppercase shadow">Carregar Backup</button>
+                </div>
+            </div>
+
+            <div id="tab-alunos" class="tab-content hidden space-y-4">
+                <div class="glass-panel p-4 rounded-xl">
+                    <label class="block text-sm font-bold mb-2 text-emerald-300">Cadastrar Aluno</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="new-student-name" placeholder="Nome do Aluno" class="flex-1 bg-slate-900 text-white rounded p-2 border border-slate-600 text-sm uppercase">
+                        <button onclick="addStudent()" class="bg-emerald-600 hover:bg-emerald-500 px-4 rounded font-bold">ADD</button>
+                    </div>
+                </div>
+                <div class="glass-panel p-4 rounded-xl">
+                    <label class="block text-sm font-bold mb-2 text-emerald-300 border-b border-slate-700 pb-2">Turma (<span id="count-students">0</span>)</label>
+                    <div id="cfg-students-list" class="space-y-2 mt-2 max-h-60 overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <div id="tab-palavras" class="tab-content hidden h-full">
+                <div class="flex flex-col gap-4 h-full">
+                    <div class="glass-panel p-3 rounded-xl flex flex-col flex-1">
+                        <label class="block text-sm font-bold mb-1 text-blue-300">Palavras Simples</label>
+                        <textarea id="cfg-words-simple" class="flex-1 w-full bg-slate-900/80 text-white rounded-xl p-2 border border-slate-600 resize-none text-xs leading-relaxed"></textarea>
+                    </div>
+                    <div class="glass-panel p-3 rounded-xl flex flex-col flex-1">
+                        <label class="block text-sm font-bold mb-1 text-purple-300">Palavras Complexas</label>
+                        <textarea id="cfg-words-complex" class="flex-1 w-full bg-slate-900/80 text-white rounded-xl p-2 border border-slate-600 resize-none text-xs leading-relaxed"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-texto" class="tab-content hidden h-full flex flex-col gap-4">
+                <div class="glass-panel p-4 rounded-xl flex items-center justify-between shrink-0">
+                    <label class="text-sm font-bold text-orange-300">Tempo de Leitura (s):</label>
+                    <input type="number" id="cfg-text-time" min="10" max="300" class="w-20 bg-slate-900 text-white text-center rounded p-2 border border-orange-500 font-bold">
+                </div>
+                <div class="glass-panel p-4 rounded-xl flex flex-col flex-1">
+                    <label class="block text-sm font-bold mb-2 text-orange-300">Texto Contínuo (CAED)</label>
+                    <textarea id="cfg-text" class="flex-1 w-full bg-slate-900/80 text-white rounded-xl p-3 border border-slate-600 resize-none text-sm leading-relaxed"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-2 space-y-2 pt-2 border-t border-slate-800 shrink-0">
+            <button onclick="saveSettings()" class="w-full py-3 text-lg font-bold btn-success rounded-xl uppercase">Salvar e Sair</button>
+            <button onclick="nav('home')" class="w-full py-2 text-sm font-bold bg-slate-800 rounded-xl">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- TELA RELATÓRIOS -->
+    <div id="screen-reports" class="game-screen hidden flex-col w-full h-full absolute top-0 left-0 bg-slate-900 p-6 z-40">
+        <h2 class="text-2xl font-black text-blue-400 mb-6 text-center uppercase tracking-widest">Relatório Técnico</h2>
+        <div class="flex-1 overflow-y-auto space-y-3" id="reports-list"></div>
+        <button onclick="exportFullReportPDF()" class="w-full py-4 mt-4 text-sm font-black btn-primary rounded-xl uppercase tracking-widest shadow-lg shrink-0">Baixar Relatório Completo (PDF)</button>
+        <button onclick="exportCSV()" class="w-full py-3 mt-2 text-sm font-black bg-teal-700 hover:bg-teal-600 rounded-xl uppercase tracking-widest shadow shrink-0">Exportar Dados (CSV)</button>
+        <button onclick="nav('home')" class="w-full py-3 mt-2 text-sm font-bold bg-slate-800 rounded-xl uppercase shrink-0">Voltar</button>
+    </div>
+
+    <!-- TELA DE JOGO - MODO PALAVRAS (Simples/Complexas) -->
+    <div id="screen-game-palavras" class="game-screen hidden flex-col w-full h-full absolute top-0 left-0 bg-gradient-to-b from-slate-900 via-slate-800 to-black p-4 z-10">
+        <header class="flex justify-between items-center glass-panel px-4 py-2 rounded-xl shadow-lg z-20">
+            <div class="flex flex-col"><span class="text-[10px] text-slate-400 font-bold uppercase">Lidas</span><span id="hud-current-p" class="text-white text-lg font-black">0</span></div>
+            <div class="flex flex-col items-center"><span class="text-[9px] text-slate-300 font-bold uppercase bg-slate-800 px-2 py-1 rounded" id="hud-mode-lbl">Modo</span></div>
+            <div class="flex flex-col text-right"><span class="text-[10px] text-slate-400 font-bold uppercase">Restantes</span><span id="hud-remain-p" class="text-blue-400 text-lg font-black">0</span></div>
+        </header>
+        <div class="flex-1 flex items-center justify-center my-2"><h2 id="game-text-p" class="text-5xl md:text-6xl font-black text-center text-white drop-shadow-[0_5px_10px_rgba(0,0,0,0.9)] break-words w-full px-2 leading-tight">...</h2></div>
+        <div class="relative w-full h-56 flex justify-center items-end shrink-0"><canvas id="gameBombCanvas" width="300" height="250" class="absolute bottom-0 drop-shadow-2xl z-10"></canvas></div>
+        <button id="btn-next-p" onclick="nextWord()" class="w-full py-5 text-3xl font-black btn-primary rounded-2xl transition-transform uppercase tracking-widest z-30 shrink-0">OK</button>
+    </div>
+
+    <!-- TELA DE JOGO - MODO TEXTO -->
+    <div id="screen-game-texto" class="game-screen hidden flex-col w-full h-full absolute top-0 left-0 bg-slate-900 z-10">
+        <header class="bg-slate-800 px-4 py-3 shadow-lg flex justify-between items-center shrink-0 border-b border-slate-700">
+            <div class="flex flex-col">
+                <span class="text-xs text-orange-400 font-bold uppercase">Cronômetro</span>
+                <span id="txt-timer" class="text-3xl font-tech text-white drop-shadow-md">60</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <span class="text-[10px] text-slate-400 font-bold uppercase">Lidas</span>
+                <span id="txt-count" class="text-2xl font-black text-emerald-400">0</span>
+            </div>
+            <div class="text-right">
+                <span class="text-xs text-slate-400 font-bold uppercase block">Aluno</span>
+                <span class="text-sm font-black text-white uppercase" id="txt-student-lbl">Nome</span>
+            </div>
+        </header>
+
+        <div id="txt-instruction" class="bg-orange-600/90 text-white text-center text-xs font-bold px-4 py-2 shrink-0">
+            Acompanhe a leitura (role o texto se precisar). Quando o aluno <b>ler tudo</b>, toque em <b>Aluno Terminou / Parar</b>. Se o <b>tempo acabar</b>, toque na última palavra lida.
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 bg-slate-900 relative">
+            <div id="text-reading-area" class="text-xl leading-loose font-medium text-slate-200 text-justify pb-20"></div>
+        </div>
+
+        <div id="txt-timeup-banner" class="hidden bg-red-600 text-white text-center text-sm font-black px-4 py-3 shrink-0 uppercase tracking-wide">
+            ⏱ Tempo esgotado! Toque na última palavra que o aluno leu.
+        </div>
+        <button id="btn-end-txt" onclick="endTextGameEarly()" class="w-full py-5 text-xl font-black btn-danger transition-transform uppercase tracking-widest shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">Aluno Terminou / Parar</button>
+    </div>
+
+    <!-- TELA DE RESULTADOS -->
+    <div id="screen-results" class="game-screen hidden flex-col w-full h-full absolute top-0 left-0 bg-gradient-to-b from-slate-900 to-black justify-center items-center p-6 text-center z-50">
+        <div class="z-10 glass-panel p-8 rounded-3xl w-full max-w-sm border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.2)]">
+            <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-b from-emerald-300 to-emerald-600 mb-2 uppercase">Concluído!</h2>
+            <p class="text-sm text-slate-400 uppercase font-bold" id="res-student">Nome</p>
+            <div class="my-6 bg-black/40 rounded-xl p-4 border border-white/5">
+                <p class="text-[10px] text-emerald-400 uppercase font-bold tracking-widest mb-1 bg-slate-800 rounded inline-block px-2 py-1" id="res-lbl-mode">Modo</p>
+                <p class="text-xs text-slate-400 uppercase font-bold tracking-widest mt-2 mb-1" id="res-lbl-type">Total de Palavras</p>
+                <span id="res-score" class="font-black text-6xl text-white drop-shadow-md">0</span>
+                <p class="text-xs text-emerald-500 font-bold mt-2" id="res-time-lbl">em 0s</p>
+                <div class="mt-3 pt-3 border-t border-white/10 flex justify-center items-center gap-3">
+                    <div><p class="text-[10px] text-slate-400 uppercase font-bold">PPM</p><span id="res-ppm" class="font-black text-2xl text-cyan-400">0</span></div>
+                    <div class="w-px h-8 bg-white/10"></div>
+                    <div><p class="text-[10px] text-slate-400 uppercase font-bold">Nível</p><span id="res-level" class="font-black text-sm text-yellow-400 uppercase">—</span></div>
+                </div>
+            </div>
+            <button onclick="nav('home')" class="w-full py-4 text-lg font-black btn-success rounded-xl uppercase tracking-wide">Salvar e Voltar</button>
+        </div>
+    </div>
+
+    <div id="countdown-overlay" class="absolute inset-0 bg-slate-900/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center hidden">
+        <span id="countdown-text" class="text-[150px] font-tech text-orange-500 drop-shadow-[0_0_40px_rgba(249,115,22,0.8)] glow-text leading-none">3</span>
+    </div>
+</div>
+
+<script>
+/** INFRA & STATE */
+const defaultWordsSimple = "casa, bola, menino, escola, sapato, gato, pato, livro, mesa, porta, janela, carro, rua, flor, sol, lua";
+const defaultWordsComplex = "paralelepípedo, inconstitucional, otorrinolaringologista, imprescindível, exceção, excentricidade, perspicaz, idiossincrasia, inexorável, plenipotenciário, estupefato";
+const defaultText = "O menino abriu a porta e viu o pequeno gato brincando com a bola de lã na rua iluminada pelo sol. Era uma manhã muito tranquila e ele decidiu ler um livro debaixo da árvore da escola.";
+
+let appData = JSON.parse(localStorage.getItem('bombaDataCAED')) || {};
+
+// Migration & Initialization
+if(!appData.settings) appData.settings = { textTime: 62, fs: false, sndF: true, sndE: true, teacher: '', school: '' };
+if(appData.settings.words && !appData.settings.wordsSimple) {
+    appData.settings.wordsSimple = appData.settings.words;
+    delete appData.settings.words;
+}
+if(!appData.settings.wordsSimple) appData.settings.wordsSimple = defaultWordsSimple;
+if(!appData.settings.wordsComplex) appData.settings.wordsComplex = defaultWordsComplex;
+if(!appData.settings.text) appData.settings.text = defaultText;
+
+if(!appData.students) appData.students = [];
+if(!appData.records) appData.records = {};
+
+// Faixas de referência de fluência (PPM) por modo — editáveis no Painel do Professor
+const defaultBands = {
+    palavras_simples:  { iniciante: 25, desenvolvimento: 50, fluente: 75 },
+    palavras_complexas:{ iniciante: 18, desenvolvimento: 36, fluente: 55 },
+    texto:             { iniciante: 40, desenvolvimento: 75, fluente: 100 }
+};
+// Migração: versão antiga tinha faixa única em appData.settings.fluencyBands
+if(!appData.settings.bandsByMode) {
+    appData.settings.bandsByMode = JSON.parse(JSON.stringify(defaultBands));
+    if(appData.settings.fluencyBands) delete appData.settings.fluencyBands;
+}
+// Garante presença de todos os modos (se backup antigo tiver estrutura parcial)
+['palavras_simples','palavras_complexas','texto'].forEach(m => {
+    if(!appData.settings.bandsByMode[m]) appData.settings.bandsByMode[m] = { ...defaultBands[m] };
+});
+
+function fluencyLevel(ppm, mode = 'texto') {
+    const b = (appData.settings.bandsByMode && appData.settings.bandsByMode[mode]) || defaultBands[mode];
+    if(ppm < b.iniciante)        return { name: 'Pré-Leitor',          color: '#ef4444', idx: 0 };
+    if(ppm < b.desenvolvimento)  return { name: 'Leitor Iniciante',    color: '#f97316', idx: 1 };
+    if(ppm < b.fluente)          return { name: 'Em Desenvolvimento',  color: '#eab308', idx: 2 };
+    return                              { name: 'Leitor Fluente',      color: '#22c55e', idx: 3 };
+}
+
+// Estatísticas descritivas de um vetor numérico
+function calcStats(arr) {
+    if(arr.length === 0) return null;
+    const sorted = [...arr].sort((a,b)=>a-b);
+    const sum = arr.reduce((a,b)=>a+b, 0);
+    const mean = sum / arr.length;
+    const mid = Math.floor(sorted.length/2);
+    const median = sorted.length % 2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
+    const variance = arr.reduce((a,b)=>a+Math.pow(b-mean,2),0) / arr.length;
+    return { n: arr.length, mean: +mean.toFixed(1), median: +median.toFixed(1), min: sorted[0], max: sorted[sorted.length-1], sd: +Math.sqrt(variance).toFixed(1) };
+}
+
+// PPM de um registro (retrocompatível; aplica piso de tempo para sanear valores implausíveis)
+function recPpm(r) {
+    const minPlausibleTime = Math.max(1, r.score * 0.25);
+    const effTime = Math.max(r.timeTaken || 0, minPlausibleTime);
+    return Math.round((r.score / effTime) * 60);
+}
+
+appData.students.forEach(s => {
+    if(!appData.records[s]) appData.records[s] = { palavras_simples: [], palavras_complexas: [], texto: [] };
+    
+    // Migrate old "palavras" to "palavras_simples"
+    if(appData.records[s].palavras) {
+        appData.records[s].palavras_simples = appData.records[s].palavras;
+        delete appData.records[s].palavras;
+    }
+    
+    if(!appData.records[s].palavras_simples) appData.records[s].palavras_simples = [];
+    if(!appData.records[s].palavras_complexas) appData.records[s].palavras_complexas = [];
+    if(!appData.records[s].texto) appData.records[s].texto = [];
+});
+
+let sys = { mode: '', student: null, list: [], totalWords: 0, index: 0, totalTime: 62, timeLeft: 62, tick: 0, active: false, raf: null, lastSec: 0, wordsRead: 0, timeUp: false };
+
+window.onload = () => { 
+    gsap.from(".title-anim", { y: -50, opacity: 0, duration: 1, ease: "bounce.out", 
+        onComplete: () => { if(typeof HomeFX !== 'undefined') HomeFX.start(); } }); 
+    FX.resize(); 
+    saveDB();
+};
+
+function saveDB() { localStorage.setItem('bombaDataCAED', JSON.stringify(appData)); }
+
+function nav(screenId, callback = null) {
+    // Cancela qualquer loop de jogo pendente e para áudio contínuo, evitando estados presos
+    sys.active = false;
+    if(sys.raf) { cancelAnimationFrame(sys.raf); sys.raf = null; }
+    if(typeof AudioSys !== 'undefined' && AudioSys.stopF) AudioSys.stopF();
+
+    // Esconde todas as telas de forma consistente (remove flex E adiciona hidden)
+    document.querySelectorAll('.game-screen').forEach(el => { el.classList.remove('flex'); el.classList.add('hidden'); });
+
+    // Reseta overlays globais que poderiam ficar presos
+    const cdo = document.getElementById('countdown-overlay');
+    if(cdo) { cdo.classList.add('hidden'); cdo.classList.remove('flex'); }
+    const banner = document.getElementById('txt-timeup-banner');
+    if(banner) banner.classList.add('hidden');
+    const readArea = document.getElementById('text-reading-area');
+    if(readArea) readArea.classList.remove('marking');
+    const txtInstr = document.getElementById('txt-instruction');
+    if(txtInstr) txtInstr.classList.remove('hidden');
+    const btnTxt = document.getElementById('btn-end-txt');
+    if(btnTxt) btnTxt.innerText = 'Aluno Terminou / Parar';
+
+    const target = document.getElementById(`screen-${screenId}`);
+    target.classList.remove('hidden'); target.classList.add('flex');
+
+    // Animação decorativa roda somente na tela inicial
+    if(typeof HomeFX !== 'undefined') { if(screenId === 'home') HomeFX.start(); else HomeFX.stop(); }
+
+    if(callback) callback();
+}
+
+/** AUDIO & FX ENGINE */
+const AudioSys = {
+    ctx: null, fO: null, fF: null, fG: null,
+    init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if(this.ctx.state === 'suspended') this.ctx.resume(); },
+    beep(f, t='sine', d=0.1, v=0.5) { 
+        if(!appData.settings.sndE || !this.ctx) return; 
+        const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+        o.type=t; o.frequency.value=f; g.gain.value=v; g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime+d);
+        o.connect(g).connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime+d);
+    },
+    tic(f = 800, type = 'square') { this.beep(f, type, 0.05, 0.1); },
+    fuse() {
+        if(!appData.settings.sndF || !this.ctx) return; this.stopF();
+        const bs = this.ctx.sampleRate * 2, b = this.ctx.createBuffer(1, bs, this.ctx.sampleRate), out = b.getChannelData(0);
+        for(let i=0; i<bs; i++) out[i] = Math.random()*2-1;
+        this.fO = this.ctx.createBufferSource(); this.fO.buffer = b; this.fO.loop = true;
+        this.fF = this.ctx.createBiquadFilter(); this.fF.type = 'bandpass'; this.fF.frequency.value = 1000; this.fF.Q.value = 1.5;
+        const lfo = this.ctx.createOscillator(); lfo.frequency.value = 15;
+        const lfoGain = this.ctx.createGain(); lfoGain.gain.value = 500;
+        lfo.connect(lfoGain); lfoGain.connect(this.fF.frequency); lfo.start();
+        this.fG = this.ctx.createGain(); this.fG.gain.value = 0.8;
+        this.fO.connect(this.fF).connect(this.fG).connect(this.ctx.destination); this.fO.start();
+    },
+    updateFuse(panic) {
+        if(this.fF) this.fF.frequency.value = 1000 + (panic * 1500);
+        if(this.fG) this.fG.gain.value = 0.8 + (panic * 0.4);
+    },
+    stopF() { if(this.fO) { this.fO.stop(); this.fO.disconnect(); this.fO = null; } },
+    exp() {
+        if(!appData.settings.sndE || !this.ctx) return;
+        const d = 2.5, bs = this.ctx.sampleRate*d, b = this.ctx.createBuffer(1, bs, this.ctx.sampleRate), out = b.getChannelData(0);
+        for(let i=0; i<bs; i++) out[i] = (Math.random()*2-1)*(1-i/bs);
+        const n = this.ctx.createBufferSource(), f = this.ctx.createBiquadFilter(), g = this.ctx.createGain();
+        n.buffer = b; f.type = 'lowpass'; f.frequency.value = 2000; f.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime+d);
+        g.gain.value = 2.5; g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime+d);
+        n.connect(f).connect(g).connect(this.ctx.destination); n.start();
+    }
+};
+
+const FX = {
+    c: document.getElementById('fxCanvas'), ctx: document.getElementById('fxCanvas').getContext('2d'), p: [], a: 0, act: false,
+    resize() { this.c.width = window.innerWidth; this.c.height = window.innerHeight; },
+    ex(cx, cy) {
+        this.resize(); this.act = true; this.a = 1; this.p = []; const c = ['#fff', '#fef08a', '#f97316', '#ef4444', '#7f1d1d'];
+        for(let i=0; i<300; i++) { const an=Math.random()*Math.PI*2, s=Math.random()*25+5; this.p.push({x:cx,y:cy,vx:Math.cos(an)*s,vy:Math.sin(an)*s,r:Math.random()*6+2,c:c[Math.floor(Math.random()*c.length)],l:1,d:Math.random()*0.02+0.01,g:Math.random()*0.2}); }
+        this.rd();
+    },
+    rd() {
+        if(!this.act) return; this.ctx.clearRect(0,0,this.c.width,this.c.height);
+        if(this.a>0){ this.ctx.fillStyle=`rgba(255,255,255,${this.a})`; this.ctx.fillRect(0,0,this.c.width,this.c.height); this.a-=0.05; }
+        let al = false;
+        this.p.forEach(p=>{ if(p.l<=0) return; al=true; p.x+=p.vx; p.y+=p.vy; p.vy+=p.g; p.l-=p.d; p.r*=0.98; this.ctx.globalAlpha=Math.max(0,p.l); this.ctx.fillStyle=p.c; this.ctx.beginPath(); this.ctx.arc(p.x,p.y,p.r,0,Math.PI*2); this.ctx.fill(); });
+        this.ctx.globalAlpha=1; if(al||this.a>0) requestAnimationFrame(()=>this.rd()); else { this.act=false; this.ctx.clearRect(0,0,this.c.width,this.c.height); }
+    }
+};
+
+class Bomb {
+    constructor(id) { this.c = document.getElementById(id); this.ctx = this.c.getContext('2d'); this.w = this.c.width; this.h = this.c.height; }
+    draw(pr, txt) {
+        this.ctx.clearRect(0,0,this.w,this.h); this.ctx.save();
+        const bw=160, bh=110, bx=(this.w-bw)/2, by=this.h-bh-10, tG = this.ctx.createLinearGradient(0,by,0,by+bh);
+        tG.addColorStop(0,'#7f1d1d'); tG.addColorStop(0.3,'#ef4444'); tG.addColorStop(0.7,'#ef4444'); tG.addColorStop(1,'#450a0a');
+        for(let i=0; i<3; i++) { this.ctx.fillStyle=tG; this.ctx.fillRect(bx+i*(49.3+6), by+(i==1?10:0), 49.3, bh-(i==1?10:0)); }
+        this.ctx.fillStyle='#111827'; this.ctx.fillRect(bx-5,by+20,bw+10,15); this.ctx.fillRect(bx-5,by+bh-30,bw+10,15);
+        this.ctx.fillStyle='#000'; this.ctx.strokeStyle='#374151'; this.ctx.lineWidth=4; this.ctx.beginPath(); this.ctx.roundRect(this.w/2-55, by+bh/2-25, 110, 50, 8); this.ctx.fill(); this.ctx.stroke();
+        this.ctx.font="900 36px 'Orbitron'"; this.ctx.textAlign='center'; this.ctx.textBaseline='middle'; this.ctx.fillStyle=pr<0.2?'#ef4444':'#ef4444'; this.ctx.fillText(txt.padStart(2,'0').substring(0,3), this.w/2, by+bh/2+3);
+        const p0={x:this.w/2+20,y:by+10}, p3={x:this.w/2+20,y:by-120}, p1={x:this.w/2+80,y:by-40}, p2={x:this.w/2+100,y:by-100};
+        const bz = t => { const mt=1-t; return {x:mt*mt*mt*p0.x+3*mt*mt*t*p1.x+3*mt*t*t*p2.x+t*t*t*p3.x, y:mt*mt*mt*p0.y+3*mt*mt*t*p1.y+3*mt*t*t*p2.y+t*t*t*p3.y}; };
+        this.ctx.lineWidth=6; this.ctx.beginPath(); this.ctx.moveTo(p0.x,p0.y); for(let i=1;i<=20;i++){ const pt=bz((i/20)*pr); this.ctx.lineTo(pt.x,pt.y); }
+        this.ctx.strokeStyle='#9ca3af'; this.ctx.setLineDash([4,2]); this.ctx.stroke(); this.ctx.setLineDash([]);
+        if(pr>0) { const tip=bz(pr); this.ctx.beginPath(); this.ctx.arc(tip.x,tip.y,6,0,Math.PI*2); this.ctx.fillStyle='#fff'; this.ctx.shadowColor='#f97316'; this.ctx.shadowBlur=15; this.ctx.fill(); }
+        this.ctx.restore();
+    }
+}
+const mBomb = new Bomb('gameBombCanvas'), mnBomb = new Bomb('miniBombCanvas');
+
+/* ─── ANIMAÇÃO DA TELA INICIAL ───────────────────────────────────────────
+   Bomba com contagem regressiva decorativa (62 → 3, reinicia em 62), tremor
+   crescente e elementos planando suavemente. Puramente estético: roda apenas
+   enquanto a home está visível e não interfere em nenhuma lógica do jogo. */
+const HomeFX = {
+    START: 62, MIN: 3, TICK_MS: 400,
+    count: 62, acc: 0, last: 0, raf: null, running: false, floats: [],
+
+    start() {
+        if(this.running) return;
+        this.running = true; this.count = this.START; this.acc = 0; this.last = performance.now();
+        this.raf = requestAnimationFrame(t => this.loop(t));
+        this.startFloats();
+    },
+
+    stop() {
+        this.running = false;
+        if(this.raf) { cancelAnimationFrame(this.raf); this.raf = null; }
+        this.stopFloats();
+        const cv = document.getElementById('miniBombCanvas');
+        if(cv) cv.style.transform = '';
+    },
+
+    loop(now) {
+        if(!this.running) return;
+        const dt = now - this.last; this.last = now; this.acc += dt;
+
+        if(this.acc >= this.TICK_MS) {
+            this.acc -= this.TICK_MS;
+            this.count--;
+            if(this.count < this.MIN) {
+                this.count = this.START;                 // reinicia o ciclo
+                const cv = document.getElementById('miniBombCanvas');
+                if(cv && typeof gsap !== 'undefined') gsap.fromTo(cv, {scale:1.18}, {scale:1, duration:0.5, ease:"elastic.out(1,0.4)"});
+            }
+        }
+
+        // Tremor: imperceptível no começo, nítido perto do fim
+        const cv = document.getElementById('miniBombCanvas');
+        if(cv) {
+            const tension = 1 - (this.count - this.MIN) / (this.START - this.MIN); // 0 → 1
+            const amp = 0.4 + tension * tension * 3.2;
+            const ang = (Math.random() * Math.PI * 2);
+            const sx = Math.cos(ang) * amp, sy = Math.sin(ang) * amp;
+            const rot = (Math.random() - 0.5) * tension * 1.6;
+            cv.style.transform = `translate(${sx.toFixed(2)}px, ${sy.toFixed(2)}px) rotate(${rot.toFixed(2)}deg)`;
+        }
+
+        mnBomb.draw(Math.max(0, (this.count - this.MIN) / (this.START - this.MIN)), String(this.count));
+        this.raf = requestAnimationFrame(t => this.loop(t));
+    },
+
+    startFloats() {
+        if(typeof gsap === 'undefined' || this.floats.length) return;
+        const mk = (sel, opts) => { const el = document.querySelector(sel); return el ? gsap.to(el, opts) : null; };
+        // Os botões NÃO planam de propósito: alvo de toque que se move
+        // aumenta o erro de clique no celular. Só o decorativo se mexe.
+        this.floats = [
+            mk('#home-title', { y: -10, rotation: -1.5, duration: 3.0, ease: "sine.inOut", yoyo: true, repeat: -1 }),
+            mk('#home-sub',   { y: -6,  duration: 2.4, ease: "sine.inOut", yoyo: true, repeat: -1, delay: 0.3 }),
+            mk('#home-foot',  { y: -3, opacity: 0.55, duration: 2.8, ease: "sine.inOut", yoyo: true, repeat: -1, delay: 0.5 })
+        ].filter(Boolean);
+    },
+
+    stopFloats() {
+        this.floats.forEach(t => { if(t) { t.kill(); if(t.targets && t.targets()[0]) gsap.set(t.targets()[0], { clearProps: "transform" }); } });
+        this.floats = [];
+        // Preserva a inclinação original do título definida pelo Tailwind
+        const ttl = document.getElementById('home-title');
+        if(ttl && typeof gsap !== 'undefined') gsap.set(ttl, { clearProps: "all" });
+    }
+};
+
+/** SETTINGS UI */
+function switchTab(id) {
+    document.querySelectorAll('.tab-content').forEach(el=>el.classList.add('hidden')); document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('block'));
+    document.getElementById(id).classList.remove('hidden'); document.getElementById(id).classList.add('block');
+    ['sistema','alunos','palavras','texto'].forEach(t => { document.getElementById('btn-tab-'+t).className = 'flex-1 py-2 font-bold rounded text-slate-400'; });
+    document.getElementById('btn-tab-'+id.split('-')[1]).className = 'flex-1 py-2 font-bold rounded bg-blue-600 text-white shadow';
+}
+
+function loadSettingsUI() {
+    switchTab('tab-sistema'); renderStudentSettings();
+    document.getElementById('cfg-teacher').value = appData.settings.teacher || '';
+    document.getElementById('cfg-school').value = appData.settings.school || '';
+    document.getElementById('cfg-words-simple').value = appData.settings.wordsSimple;
+    document.getElementById('cfg-words-complex').value = appData.settings.wordsComplex;
+    document.getElementById('cfg-text').value = appData.settings.text;
+    document.getElementById('cfg-text-time').value = appData.settings.textTime;
+    document.getElementById('cfg-fs').checked = appData.settings.fs;
+    document.getElementById('cfg-snd-f').checked = appData.settings.sndF;
+    document.getElementById('cfg-snd-e').checked = appData.settings.sndE;
+    const bm = appData.settings.bandsByMode;
+    document.getElementById('cfg-band-ps-ini').value = bm.palavras_simples.iniciante;
+    document.getElementById('cfg-band-ps-dev').value = bm.palavras_simples.desenvolvimento;
+    document.getElementById('cfg-band-ps-flu').value = bm.palavras_simples.fluente;
+    document.getElementById('cfg-band-pc-ini').value = bm.palavras_complexas.iniciante;
+    document.getElementById('cfg-band-pc-dev').value = bm.palavras_complexas.desenvolvimento;
+    document.getElementById('cfg-band-pc-flu').value = bm.palavras_complexas.fluente;
+    document.getElementById('cfg-band-tx-ini').value = bm.texto.iniciante;
+    document.getElementById('cfg-band-tx-dev').value = bm.texto.desenvolvimento;
+    document.getElementById('cfg-band-tx-flu').value = bm.texto.fluente;
+}
+
+function saveSettings() {
+    appData.settings.teacher = document.getElementById('cfg-teacher').value;
+    appData.settings.school = document.getElementById('cfg-school').value;
+    appData.settings.wordsSimple = document.getElementById('cfg-words-simple').value;
+    appData.settings.wordsComplex = document.getElementById('cfg-words-complex').value;
+    appData.settings.text = document.getElementById('cfg-text').value;
+    appData.settings.textTime = parseInt(document.getElementById('cfg-text-time').value) || 62;
+    appData.settings.fs = document.getElementById('cfg-fs').checked;
+    appData.settings.sndF = document.getElementById('cfg-snd-f').checked;
+    appData.settings.sndE = document.getElementById('cfg-snd-e').checked;
+    const gi = (id, def) => parseInt(document.getElementById(id).value) || def;
+    appData.settings.bandsByMode = {
+        palavras_simples:   { iniciante: gi('cfg-band-ps-ini',25), desenvolvimento: gi('cfg-band-ps-dev',50), fluente: gi('cfg-band-ps-flu',75) },
+        palavras_complexas: { iniciante: gi('cfg-band-pc-ini',18), desenvolvimento: gi('cfg-band-pc-dev',36), fluente: gi('cfg-band-pc-flu',55) },
+        texto:              { iniciante: gi('cfg-band-tx-ini',40), desenvolvimento: gi('cfg-band-tx-dev',75), fluente: gi('cfg-band-tx-flu',100) }
+    };
+    saveDB();
+    if(!document.fullscreenElement && appData.settings.fs) document.documentElement.requestFullscreen().catch(()=>{});
+    else if(document.fullscreenElement && !appData.settings.fs) document.exitFullscreen().catch(()=>{});
+    nav('home');
+}
+
+function renderStudentSettings() {
+    document.getElementById('count-students').innerText = appData.students.length;
+    document.getElementById('cfg-students-list').innerHTML = appData.students.map((s,i) => `
+        <div class="flex justify-between items-center bg-slate-800 p-2 rounded border border-slate-700">
+            <span class="text-white text-sm font-bold uppercase truncate">${s}</span>
+            <button onclick="remStudent(${i})" class="text-red-500 hover:text-red-400 font-black px-2">X</button>
+        </div>
+    `).join('');
+    
+    const sel = document.getElementById('student-select-list');
+    if(appData.students.length === 0) sel.innerHTML = '<p class="text-center text-slate-400 mt-10 uppercase text-sm font-bold">Nenhum aluno cadastrado.</p>';
+    else sel.innerHTML = appData.students.map(s => `
+        <button onclick="selectStudent('${s}')" class="w-full text-left p-4 bg-slate-800 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl font-black text-white text-xl uppercase mb-2 shadow transition-colors border border-slate-700">${s}</button>
+    `).join('');
+}
+function addStudent() {
+    const v = document.getElementById('new-student-name').value.trim().toUpperCase();
+    if(v && !appData.students.includes(v)) { appData.students.push(v); if(!appData.records[v]) appData.records[v] = { palavras_simples: [], palavras_complexas: [], texto: [] }; document.getElementById('new-student-name').value = ''; saveDB(); renderStudentSettings(); }
+}
+function remStudent(i) {
+    if(confirm("Remover aluno e seus registros?")) { delete appData.records[appData.students[i]]; appData.students.splice(i,1); saveDB(); renderStudentSettings(); }
+}
+function selectStudent(name) { sys.student = name; document.getElementById('lbl-current-student').innerText = name; document.getElementById('lbl-text-time').innerText = appData.settings.textTime; nav('mode'); }
+
+function downloadBackup() { const a = document.createElement('a'); a.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(appData)); a.download = `backup_bomba_${Date.now()}.json`; a.click(); }
+function restoreBackup(e) {
+    const file = e.target.files[0]; if(!file) return; const reader = new FileReader();
+    reader.onload = (ev) => { 
+        try { 
+            let imported = JSON.parse(ev.target.result); 
+            // Normalize imported data
+            imported.students.forEach(s => {
+                if(imported.records[s] && imported.records[s].palavras) {
+                    imported.records[s].palavras_simples = imported.records[s].palavras;
+                    delete imported.records[s].palavras;
+                }
+                if(!imported.records[s]) imported.records[s] = { palavras_simples: [], palavras_complexas: [], texto: [] };
+                if(!imported.records[s].palavras_simples) imported.records[s].palavras_simples = [];
+                if(!imported.records[s].palavras_complexas) imported.records[s].palavras_complexas = [];
+                if(!imported.records[s].texto) imported.records[s].texto = [];
+            });
+            if(imported.settings.words && !imported.settings.wordsSimple) {
+                imported.settings.wordsSimple = imported.settings.words;
+                delete imported.settings.words;
+                imported.settings.wordsComplex = defaultWordsComplex;
+            }
+            appData = imported; saveDB(); alert('Backup carregado com sucesso!'); loadSettingsUI(); 
+        } catch(err){ alert('Arquivo inválido!'); } 
+    }; reader.readAsText(file);
+}
+
+/** GAME LOGIC */
+function startCountdown(cb) {
+    const ov = document.getElementById('countdown-overlay'), txt = document.getElementById('countdown-text');
+    ov.classList.remove('hidden'); ov.classList.add('flex'); let count = 3; txt.textContent = count; 
+    gsap.fromTo(txt, {scale:0.5,opacity:0}, {scale:1,opacity:1,duration:0.5,ease:"back.out(1.7)"}); AudioSys.beep(440,'triangle',0.2,0.3);
+    let int = setInterval(()=>{
+        count--;
+        if(count>0){ txt.textContent = count; gsap.fromTo(txt, {scale:0.5,opacity:0}, {scale:1,opacity:1,duration:0.5,ease:"back.out(1.7)"}); AudioSys.beep(440,'triangle',0.2,0.3); } 
+        else { clearInterval(int); txt.textContent="VAI!"; gsap.fromTo(txt, {scale:1}, {scale:1.5,opacity:0,duration:0.8,ease:"power2.in"}); AudioSys.beep(880,'triangle',0.5,0.3); setTimeout(()=>{ov.classList.add('hidden');ov.classList.remove('flex');cb();},500); }
+    },1000);
+}
+
+function initGame(mode, time) {
+    if(!sys.student) return alert("Selecione um aluno primeiro!");
+    AudioSys.init(); if(appData.settings.fs && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+    sys.mode = mode; sys.index = 0; sys.active = false; sys.totalTime = time; sys.timeLeft = time; sys.lastSec = time;
+    
+    if(mode === 'palavras_simples' || mode === 'palavras_complexas') {
+        const wordsStr = mode === 'palavras_simples' ? appData.settings.wordsSimple : appData.settings.wordsComplex;
+        sys.list = wordsStr.split(',').map(w=>w.trim()).filter(w=>w.length>0).sort(()=>Math.random()-0.5);
+        if(sys.list.length===0) sys.list=['vazio'];
+        
+        document.getElementById('hud-mode-lbl').innerText = mode === 'palavras_simples' ? 'SIMPLES' : 'COMPLEXAS';
+        document.getElementById('hud-mode-lbl').className = mode === 'palavras_simples' ? 'text-[9px] text-white font-bold uppercase bg-blue-600 px-2 py-1 rounded' : 'text-[9px] text-white font-bold uppercase bg-purple-600 px-2 py-1 rounded';
+        
+        document.getElementById('hud-current-p').innerText = '0'; document.getElementById('hud-remain-p').innerText = sys.list.length;
+        document.getElementById('game-text-p').innerText = '...'; mBomb.draw(1, time.toString());
+        nav('game-palavras', () => startCountdown(loopPalavrasInit));
+    } else {
+        sys.list = appData.settings.text.trim().split(/\s+/).filter(w=>w.length>0);
+        sys.totalWords = sys.list.length;
+        if(sys.totalWords===0) sys.list=['Vazio'];
+        sys.wordsRead = 0; sys.timeUp = false;
+        document.getElementById('txt-student-lbl').innerText = sys.student;
+        document.getElementById('txt-count').innerText = '0';
+        document.getElementById('txt-timer').innerText = time; document.getElementById('txt-timer').className = 'text-3xl font-tech text-white drop-shadow-md';
+        document.getElementById('txt-timeup-banner').classList.add('hidden');
+        document.getElementById('txt-instruction').classList.remove('hidden');
+        document.getElementById('btn-end-txt').innerText = 'Aluno Terminou / Parar';
+        const readArea = document.getElementById('text-reading-area');
+        readArea.classList.remove('marking');
+        readArea.innerHTML = sys.list.map((w,i) => `<span class="word-span" data-i="${i}"><sup class="word-num">${i+1}</sup>${w}</span>`).join(' ');
+        readArea.scrollTop = 0;
+        initReadingAreaTouch();
+        nav('game-texto', () => startCountdown(loopTextoInit));
+    }
+}
+
+function loopPalavrasInit() { sys.active = true; sys.tick = performance.now(); showWordP(); AudioSys.fuse(); requestAnimationFrame(loopP); }
+function showWordP() {
+    const el = document.getElementById('game-text-p'); el.innerText = sys.list[sys.index].toUpperCase();
+    el.className = sys.list[sys.index].length > 15 ? 'text-4xl md:text-5xl font-black text-center text-white drop-shadow-md break-words w-full px-2' : 'text-5xl md:text-6xl font-black text-center text-white drop-shadow-lg break-words w-full px-2';
+    gsap.fromTo(el, {scale:0.8,opacity:0}, {scale:1,opacity:1,duration:0.3,ease:"back.out(1.5)"});
+}
+function nextWord() {
+    if(!sys.active) return; sys.index++; document.getElementById('hud-current-p').innerText = sys.index; document.getElementById('hud-remain-p').innerText = sys.list.length - sys.index;
+    if(sys.index >= sys.list.length) endPalavras(true); else { showWordP(); gsap.to("#btn-next-p", {scale:0.95,duration:0.05,yoyo:true,repeat:1}); }
+}
+function loopP(now) {
+    if(!sys.active) return; const d = (now - sys.tick)/1000; sys.tick = now; sys.timeLeft -= d;
+    let pr = Math.max(0, sys.timeLeft/sys.totalTime); if(sys.timeLeft<10) pr = pr*pr;
+    const cs = Math.ceil(sys.timeLeft);
+    
+    if(cs !== sys.lastSec && cs >= 0) { 
+        sys.lastSec = cs; 
+        if(cs <= 10 && cs > 0) { AudioSys.tic(880, 'square'); gsap.fromTo("#gameBombCanvas", {scale:1.05},{scale:1,duration:0.3}); }
+        else if (cs > 0) { AudioSys.tic(); }
+    }
+    const panic = sys.timeLeft < 10 ? (10 - sys.timeLeft)/10 : 0; AudioSys.updateFuse(panic);
+    mBomb.draw(pr, cs.toString());
+    
+    if(sys.timeLeft <= 0) { endPalavras(false); } else { sys.raf = requestAnimationFrame(loopP); }
+}
+
+function endPalavras(completed) {
+    sys.active = false; cancelAnimationFrame(sys.raf); AudioSys.stopF();
+    if (!completed) {
+        AudioSys.exp();
+        const rect = document.getElementById('gameBombCanvas').getBoundingClientRect(); FX.ex(rect.left+rect.width/2, rect.top+rect.height/2);
+        if(navigator.vibrate) navigator.vibrate([400,100,400]);
+        setTimeout(() => showResults(sys.index, sys.totalTime), 1500); 
+    } else {
+        showResults(sys.index, sys.totalTime - Math.max(0, sys.timeLeft));
+    }
+}
+
+function loopTextoInit() { sys.active = true; sys.tick = performance.now(); requestAnimationFrame(loopT); }
+function loopT(now) {
+    if(!sys.active) return; const d = (now - sys.tick)/1000; sys.tick = now; sys.timeLeft -= d;
+    const cs = Math.ceil(sys.timeLeft);
+    if(cs !== sys.lastSec && cs >= 0) {
+        sys.lastSec = cs; document.getElementById('txt-timer').innerText = cs;
+        if(cs <= 10 && cs > 0) { document.getElementById('txt-timer').classList.replace('text-white', 'text-red-500'); AudioSys.tic(880, 'square'); }
+    }
+    if(sys.timeLeft <= 0) {
+        // Tempo esgotou: trava o cronômetro e habilita a marcação da última palavra lida
+        sys.timeUp = true; sys.active = false; sys.timeLeft = 0;
+        document.getElementById('txt-timer').innerText = 0;
+        AudioSys.exp(); if(navigator.vibrate) navigator.vibrate([400,100,400]);
+        document.getElementById('txt-instruction').classList.add('hidden');
+        document.getElementById('txt-timeup-banner').classList.remove('hidden');
+        document.getElementById('text-reading-area').classList.add('marking');
+        document.getElementById('btn-end-txt').innerText = 'Confirmar Palavras Lidas';
+    } else sys.raf = requestAnimationFrame(loopT);
+}
+
+// Marca a última palavra lida — SOMENTE após o tempo esgotar.
+// Durante a leitura, o texto apenas rola (as palavras não são clicáveis).
+function markWord(wordIndex) {
+    // Trava total: só aceita toque depois que o tempo acabou.
+    if(!sys.timeUp) return;
+    sys.wordsRead = wordIndex + 1;
+    const cnt = document.getElementById('txt-count');
+    cnt.innerText = sys.wordsRead;
+    document.querySelectorAll('#text-reading-area .word-span').forEach((el, i) => {
+        el.classList.toggle('word-done', i < sys.wordsRead);
+        el.classList.toggle('word-last', i === wordIndex);
+        el.classList.remove('tapping');
+    });
+    // Confirmação multissensorial: som, vibração e pulso no contador
+    AudioSys.tic(1200, 'sine');
+    if(navigator.vibrate) navigator.vibrate(35);
+    if(typeof gsap !== 'undefined') gsap.fromTo(cnt, {scale:1.6}, {scale:1, duration:0.35, ease:"back.out(2)"});
+    // Não finaliza aqui: professor confirma no botão "Confirmar Palavras Lidas".
+}
+
+/* Detecção de toque robusta para celular.
+   Dentro de um container rolável, um 'click' é cancelado se o dedo se mover
+   um pouco. Por isso tratamos pointerdown/pointerup manualmente, aceitando o
+   toque quando o dedo praticamente não se deslocou (não foi rolagem). */
+function initReadingAreaTouch() {
+    const area = document.getElementById('text-reading-area');
+    if(!area || area.dataset.touchBound === '1') return;
+    area.dataset.touchBound = '1';
+
+    let startX = 0, startY = 0, startT = 0, candidate = null;
+    const MOVE_TOL = 14;   // px de tolerância — acima disso foi rolagem
+    const TIME_TOL = 1200; // ms — toque longo demais não conta
+
+    const wordFrom = (target) => (target && target.closest) ? target.closest('.word-span') : null;
+
+    area.addEventListener('pointerdown', (e) => {
+        if(!sys.timeUp) return;
+        startX = e.clientX; startY = e.clientY; startT = Date.now();
+        candidate = wordFrom(e.target);
+        if(candidate) candidate.classList.add('tapping');
+    }, { passive: true });
+
+    const clearTap = () => { if(candidate) candidate.classList.remove('tapping'); candidate = null; };
+
+    area.addEventListener('pointermove', (e) => {
+        if(!candidate) return;
+        if(Math.abs(e.clientX - startX) > MOVE_TOL || Math.abs(e.clientY - startY) > MOVE_TOL) clearTap();
+    }, { passive: true });
+
+    area.addEventListener('pointercancel', clearTap, { passive: true });
+    area.addEventListener('pointerleave', clearTap, { passive: true });
+
+    area.addEventListener('pointerup', (e) => {
+        if(!sys.timeUp) { clearTap(); return; }
+        const el = candidate;
+        clearTap();
+        if(!el) return;
+        const moved = Math.abs(e.clientX - startX) > MOVE_TOL || Math.abs(e.clientY - startY) > MOVE_TOL;
+        const tooLong = (Date.now() - startT) > TIME_TOL;
+        if(moved || tooLong) return; // foi rolagem, não toque
+        const idx = parseInt(el.dataset.i, 10);
+        if(!isNaN(idx)) markWord(idx);
+    }, { passive: true });
+
+    // Reserva: navegadores sem Pointer Events caem no click tradicional
+    area.addEventListener('click', (e) => {
+        if(!sys.timeUp) return;
+        if(window.PointerEvent) return; // já tratado acima
+        const el = wordFrom(e.target);
+        if(!el) return;
+        const idx = parseInt(el.dataset.i, 10);
+        if(!isNaN(idx)) markWord(idx);
+    });
+}
+
+// Encerramento manual pelo botão:
+// - durante a leitura (tempo correndo): o aluno terminou antes → registra o texto inteiro;
+// - após o tempo esgotar: confirma a última palavra que o professor marcou.
+function endTextGameEarly() {
+    if(!sys.active && !sys.timeUp) return;
+    if(sys.active) {
+        // Aluno terminou de ler tudo antes do tempo acabar.
+        sys.wordsRead = sys.totalWords;
+    }
+    finalizeTexto();
+}
+
+function finalizeTexto() {
+    sys.active = false; cancelAnimationFrame(sys.raf); AudioSys.stopF();
+    const elapsed = sys.timeUp ? sys.totalTime : (sys.totalTime - Math.max(0, sys.timeLeft));
+    showResults(sys.wordsRead, elapsed);
+}
+
+function showResults(score, timeTaken) {
+    // Esconde telas de jogo de forma consistente (remove flex + adiciona hidden)
+    ['screen-game-palavras','screen-game-texto'].forEach(id => {
+        const el = document.getElementById(id); el.classList.remove('flex'); el.classList.add('hidden');
+    });
+    // Garante que overlays de jogo não fiquem presos
+    document.getElementById('txt-timeup-banner').classList.add('hidden');
+    // Piso de tempo defensivo: evita PPM irreal quando a sessão é encerrada muito rápido (engano de clique).
+    // A métrica exige pelo menos ~0.25s por palavra lida; abaixo disso o tempo bruto seria implausível.
+    const minPlausibleTime = Math.max(1, score * 0.25);
+    const effTime = Math.max(timeTaken, minPlausibleTime);
+    const rec = { date: new Date().toLocaleString('pt-BR'), score: score, timeLimit: sys.totalTime, timeTaken: parseFloat(timeTaken.toFixed(1)), ppm: Math.round((score / effTime) * 60) };
+    if(sys.mode === 'texto') rec.totalWords = sys.totalWords;
+    
+    if(!appData.records[sys.student]) appData.records[sys.student] = { palavras_simples: [], palavras_complexas: [], texto: [] };
+    if(!appData.records[sys.student][sys.mode]) appData.records[sys.student][sys.mode] = [];
+    appData.records[sys.student][sys.mode].push(rec); 
+    saveDB();
+
+    document.getElementById('res-student').innerText = sys.student;
+    
+    let modeName = "Texto";
+    if(sys.mode === 'palavras_simples') modeName = "Palavras Simples";
+    if(sys.mode === 'palavras_complexas') modeName = "Palavras Complexas";
+    document.getElementById('res-lbl-mode').innerText = modeName;
+    
+    document.getElementById('res-lbl-type').innerText = sys.mode === 'texto' ? `Palavras Lidas (de ${sys.totalWords})` : 'Palavras Lidas';
+    document.getElementById('res-score').innerText = score;
+    document.getElementById('res-time-lbl').innerText = `em ${rec.timeTaken}s (Limite: ${sys.totalTime}s)`;
+    document.getElementById('res-ppm').innerText = rec.ppm;
+    const lvl = fluencyLevel(rec.ppm, sys.mode);
+    document.getElementById('res-level').innerText = lvl.name;
+    document.getElementById('res-level').style.color = lvl.color;
+
+    const res = document.getElementById('screen-results'); res.classList.remove('hidden'); res.classList.add('flex');
+    gsap.from(".glass-panel", {scale:0.8, opacity:0, duration:0.5, ease:"back.out"});
+}
+
+/** RELATÓRIOS & PDF */
+function evoBadge(records) {
+    if(records.length < 2) return '';
+    const first = records[0].score, last = records[records.length-1].score;
+    if(first === 0) return '';
+    const pct = Math.round(((last - first) / first) * 100);
+    const cls = pct >= 0 ? 'text-green-400' : 'text-red-400';
+    const arrow = pct >= 0 ? '▲' : '▼';
+    return `<span class="${cls} text-[10px] font-black ml-1">${arrow} ${Math.abs(pct)}%</span>`;
+}
+
+function renderReports() {
+    const list = document.getElementById('reports-list');
+    if(appData.students.length === 0) { list.innerHTML = '<p class="text-center text-slate-400 mt-10">Cadastre alunos para ver relatórios.</p>'; return; }
+
+    // Painel resumo da turma (última avaliação de texto de cada aluno)
+    const lastPpms = [];
+    appData.students.forEach(s => {
+        const tR = appData.records[s]?.texto || [];
+        if(tR.length > 0) lastPpms.push(recPpm(tR[tR.length-1]));
+    });
+    const st = calcStats(lastPpms);
+    let summaryHtml = '';
+    if(st) {
+        const counts = [0,0,0,0];
+        lastPpms.forEach(p => counts[fluencyLevel(p, 'texto').idx]++);
+        summaryHtml = `
+        <div class="glass-panel p-4 rounded-xl border border-cyan-500/30 mb-1">
+            <h4 class="font-black text-cyan-400 uppercase text-sm mb-2 tracking-widest">Turma — PPM (Texto, última aval.)</h4>
+            <div class="grid grid-cols-4 gap-2 text-center text-xs mb-3">
+                <div class="bg-slate-900 rounded p-2"><span class="block text-slate-400 text-[9px] uppercase">Média</span><span class="font-black text-white text-lg">${st.mean}</span></div>
+                <div class="bg-slate-900 rounded p-2"><span class="block text-slate-400 text-[9px] uppercase">Mediana</span><span class="font-black text-white text-lg">${st.median}</span></div>
+                <div class="bg-slate-900 rounded p-2"><span class="block text-slate-400 text-[9px] uppercase">Mín</span><span class="font-black text-white text-lg">${st.min}</span></div>
+                <div class="bg-slate-900 rounded p-2"><span class="block text-slate-400 text-[9px] uppercase">Máx</span><span class="font-black text-white text-lg">${st.max}</span></div>
+            </div>
+            <div class="flex gap-1 text-[9px] font-bold text-center">
+                <div class="flex-1 bg-red-500/20 text-red-400 rounded py-1">Pré: ${counts[0]}</div>
+                <div class="flex-1 bg-orange-500/20 text-orange-400 rounded py-1">Inic: ${counts[1]}</div>
+                <div class="flex-1 bg-yellow-500/20 text-yellow-400 rounded py-1">Des: ${counts[2]}</div>
+                <div class="flex-1 bg-green-500/20 text-green-400 rounded py-1">Flu: ${counts[3]}</div>
+            </div>
+        </div>`;
+    }
+
+    list.innerHTML = summaryHtml + appData.students.map(s => {
+        const psR = appData.records[s]?.palavras_simples||[];
+        const pcR = appData.records[s]?.palavras_complexas||[];
+        const tR = appData.records[s]?.texto||[];
+
+        const psLast = psR.length > 0 ? psR[psR.length-1].score : '-';
+        const pcLast = pcR.length > 0 ? pcR[pcR.length-1].score : '-';
+        const tLast = tR.length > 0 ? tR[tR.length-1].score : '-';
+        const tPpm = tR.length > 0 ? recPpm(tR[tR.length-1]) : null;
+        const lvlHtml = tPpm !== null ? `<span class="text-[10px] font-black px-2 py-0.5 rounded" style="color:${fluencyLevel(tPpm,'texto').color}; background:rgba(255,255,255,0.06)">${fluencyLevel(tPpm,'texto').name} · ${tPpm} PPM</span>` : '';
+
+        return `
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow flex flex-col gap-2">
+            <div class="flex justify-between items-center flex-wrap gap-1">
+                <h4 class="font-black text-emerald-400 uppercase text-lg">${s}</h4>
+                ${lvlHtml}
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-xs text-center">
+                <div class="bg-slate-900 rounded p-1"><span class="block text-slate-400 mb-1">Simples (${psR.length}x)</span> <span class="font-bold text-blue-400 text-lg">${psLast}</span>${evoBadge(psR)}</div>
+                <div class="bg-slate-900 rounded p-1"><span class="block text-slate-400 mb-1">Complex. (${pcR.length}x)</span> <span class="font-bold text-purple-400 text-lg">${pcLast}</span>${evoBadge(pcR)}</div>
+                <div class="bg-slate-900 rounded p-1"><span class="block text-slate-400 mb-1">Texto (${tR.length}x)</span> <span class="font-bold text-orange-400 text-lg">${tLast}</span>${evoBadge(tR)}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+/** EXPORTAÇÃO CSV (dados brutos para análise) */
+function exportCSV() {
+    if(appData.students.length === 0) return alert("Não há dados.");
+    const rows = [['aluno','modo','sessao','data','resultado','tempo_utilizado_s','tempo_limite_s','ppm','nivel_fluencia','total_palavras_texto']];
+    const modeNames = { palavras_simples: 'Palavras Simples', palavras_complexas: 'Palavras Complexas', texto: 'Texto Corrido' };
+    appData.students.forEach(s => {
+        ['palavras_simples','palavras_complexas','texto'].forEach(m => {
+            (appData.records[s]?.[m] || []).forEach((r, i) => {
+                const ppm = recPpm(r);
+                rows.push([s, modeNames[m], i+1, r.date, r.score, r.timeTaken, r.timeLimit, ppm, fluencyLevel(ppm, m).name, r.totalWords ?? '']);
+            });
+        });
+    });
+    const csv = '\ufeff' + rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    a.download = `BombaDePalavras_Dados_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+}
+
+const getDM = (dateStr) => { const parts = dateStr.split(' ')[0].split('/'); return `${parts[0]}/${parts[1]}`; };
+
+// Plugin Chart.js: fundo branco (evita fundo preto na exportação JPEG)
+const whiteBgPlugin = {
+    id: 'whiteBg',
+    beforeDraw(chart) {
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, chart.width, chart.height);
+        ctx.restore();
+    }
+};
+
+const PDF_CHART_OPTS = {
+    animation: false, responsive: false,
+    plugins: {
+        legend: { labels: { color: '#1e293b', font: { size: 14, weight: 'bold' } } },
+        title: { display: false }
+    },
+    scales: {
+        x: { ticks: { color: '#334155', font: { size: 11 } }, grid: { color: '#e2e8f0' } },
+        y: { ticks: { color: '#334155', font: { size: 12 } }, grid: { color: '#e2e8f0' }, beginAtZero: true }
+    }
+};
+
+async function exportFullReportPDF() {
+    if(appData.students.length === 0) return alert("Não há dados.");
+    const { jsPDF } = window.jspdf; 
+    const doc = new jsPDF(); 
+    
+    const teacher = appData.settings.teacher || 'Não informado';
+    const school = appData.settings.school || 'Não informado';
+    const emissao = new Date().toLocaleString('pt-BR');
+    const NAVY = [28, 61, 110], SLATE = [51, 65, 85], GRAY = [120, 130, 145], GREEN = [16, 122, 87];
+
+    // ---- CAPA ----
+    doc.setFillColor(...NAVY); doc.rect(0, 0, 210, 297, 'F');
+    doc.setFillColor(255, 255, 255); doc.rect(12, 12, 186, 273, 'F');
+    doc.setFillColor(...NAVY); doc.rect(12, 12, 186, 4, 'F'); doc.rect(12, 281, 186, 4, 'F');
+
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...GRAY);
+    doc.text("INSTRUMENTO PEDAGÓGICO DE AVALIAÇÃO DA FLUÊNCIA LEITORA", 105, 60, null, null, "center");
+
+    doc.setFontSize(34); doc.setTextColor(...NAVY);
+    doc.text("BOMBA DE", 105, 100, null, null, "center");
+    doc.text("PALAVRAS", 105, 115, null, null, "center");
+
+    doc.setFontSize(13); doc.setTextColor(...SLATE);
+    doc.text("Relatório Técnico-Pedagógico de Desempenho", 105, 130, null, null, "center");
+
+    doc.setDrawColor(...NAVY); doc.setLineWidth(0.8); doc.line(65, 140, 145, 140);
+
+    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
+    doc.text(`Professor(a): ${teacher}`, 105, 170, null, null, "center");
+    doc.text(`Escola / Turma: ${school}`, 105, 178, null, null, "center");
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    doc.text(`Alunos avaliados: ${appData.students.length}`, 105, 186, null, null, "center");
+    doc.text(`Emissão: ${emissao}`, 105, 194, null, null, "center");
+
+    doc.setFontSize(8); doc.setTextColor(...GRAY);
+    doc.text("Desenvolvido por A.R.S. — HTML Games e Apps Pedagógicos", 105, 265, null, null, "center");
+    doc.text("Ferramenta autoral criada pelo docente com apoio de Inteligência Artificial Generativa", 105, 270, null, null, "center");
+
+    // ---- CABEÇALHO E RODAPÉ DAS PÁGINAS INTERNAS ----
+    const drawHeader = (title) => {
+        doc.setFillColor(...NAVY); doc.rect(0, 0, 210, 26, 'F');
+        doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(255, 255, 255);
+        doc.text("BOMBA DE PALAVRAS — RELATÓRIO TÉCNICO-PEDAGÓGICO", 105, 11, null, null, "center");
+        doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(200, 210, 225);
+        doc.text(`${school}  ·  Prof. ${teacher}  ·  ${emissao}`, 105, 18, null, null, "center");
+        doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.setTextColor(...GREEN);
+        doc.text(title, 105, 38, null, null, "center");
+        doc.setTextColor(0,0,0);
+    };
+    const drawFooters = () => {
+        const total = doc.internal.getNumberOfPages();
+        for(let p = 2; p <= total; p++) {
+            doc.setPage(p);
+            doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(...GRAY);
+            doc.setDrawColor(220, 225, 232); doc.setLineWidth(0.3); doc.line(14, 285, 196, 285);
+            doc.text("Bomba de Palavras · A.R.S. HTML Games e Apps Pedagógicos", 14, 290);
+            doc.text(`Página ${p - 1} de ${total - 1}`, 196, 290, null, null, "right");
+        }
+    };
+
+    // Barra de cabeçalho para páginas de continuação de tabelas longas
+    let _tblTitle = '';
+    const contHeader = (data) => {
+        if(data.pageNumber === 1) return;
+        doc.setFillColor(...NAVY); doc.rect(0, 0, 210, 26, 'F');
+        doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(255, 255, 255);
+        doc.text("BOMBA DE PALAVRAS — RELATÓRIO TÉCNICO-PEDAGÓGICO", 105, 11, null, null, "center");
+        doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(200, 210, 225);
+        doc.text(`${school}  ·  Prof. ${teacher}  ·  ${emissao}`, 105, 18, null, null, "center");
+        doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(...GREEN);
+        doc.text(`${_tblTitle} (continuação)`, 105, 34, null, null, "center");
+        doc.setTextColor(0,0,0);
+    };
+    const TBL_CONT = { margin: { top: 40 }, didDrawPage: contHeader };
+
+    // --- PÁGINA 1: SUMÁRIO EXECUTIVO ---
+    doc.addPage(); drawHeader("SUMÁRIO EXECUTIVO");
+
+    const MODES = ['palavras_simples','palavras_complexas','texto'];
+    const modeLabels = { palavras_simples: 'Palavras Simples', palavras_complexas: 'Palavras Complexas', texto: 'Texto Corrido' };
+    const modeColors = { palavras_simples: [37,99,235], palavras_complexas: [147,51,234], texto: [234,88,12] };
+
+    // Estatísticas por modo: palavras lidas E PPM (todas as sessões)
+    const wordsByMode = { palavras_simples: [], palavras_complexas: [], texto: [] };
+    const ppmByMode   = { palavras_simples: [], palavras_complexas: [], texto: [] };
+    // Última avaliação de cada aluno, por modo — base das classificações
+    const lastByMode  = { palavras_simples: [], palavras_complexas: [], texto: [] };
+    let totalSessions = 0;
+    appData.students.forEach(st => {
+        MODES.forEach(m => {
+            const recs = appData.records[st]?.[m] || [];
+            totalSessions += recs.length;
+            recs.forEach(r => { wordsByMode[m].push(r.score); ppmByMode[m].push(recPpm(r)); });
+            if(recs.length > 0) {
+                const last = recs[recs.length-1];
+                lastByMode[m].push({ name: st, words: last.score, ppm: recPpm(last), time: last.timeTaken });
+            }
+        });
+    });
+    const lastPpmByStudent = lastByMode.texto.map(e => ({ name: e.name, ppm: e.ppm, words: e.words }));
+
+    let y = 48;
+    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
+    doc.text(`Este relatório consolida ${totalSessions} sessões de avaliação realizadas com ${appData.students.length} aluno(s), nos três modos do instrumento. Cada modo é apresentado em duas medidas complementares: o total de palavras lidas (dado bruto observado em sala) e o PPM (indicador estatístico derivado).`, 14, y, { maxWidth: 182 });
+    y += 16;
+
+    // Tabela 1 — palavras lidas
+    const wordRows = [], ppmRows = [];
+    MODES.forEach(m => {
+        const sw = calcStats(wordsByMode[m]); const sp = calcStats(ppmByMode[m]);
+        if(sw) wordRows.push([modeLabels[m], sw.n, sw.mean, sw.median, sw.min, sw.max, sw.sd]);
+        if(sp) ppmRows.push([modeLabels[m], sp.n, sp.mean, sp.median, sp.min, sp.max, sp.sd]);
+    });
+    const statHead = [['Modo', 'Sessões', 'Média', 'Mediana', 'Mín', 'Máx', 'Desv. Pad.']];
+    const statOpts = { theme:'grid', styles:{fontSize:9, halign:'center'}, columnStyles:{0:{halign:'left',fontStyle:'bold'}}, headStyles:{fillColor:NAVY, fontSize:9} };
+
+    if(wordRows.length > 0) {
+        doc.setFontSize(11); doc.setFont("helvetica","bold"); doc.setTextColor(...NAVY);
+        doc.text("Palavras lidas (dado bruto)", 14, y); y += 4;
+        doc.autoTable({ startY: y, head: statHead, body: wordRows, ...statOpts });
+        y = doc.lastAutoTable.finalY + 9;
+    }
+    if(ppmRows.length > 0) {
+        doc.setFontSize(11); doc.setFont("helvetica","bold"); doc.setTextColor(...NAVY);
+        doc.text("PPM — palavras por minuto (indicador estatístico)", 14, y); y += 4;
+        doc.autoTable({ startY: y, head: statHead, body: ppmRows, ...statOpts });
+        y = doc.lastAutoTable.finalY + 12;
+    }
+
+    // Classificação da turma no Texto Corrido — com palavras lidas E PPM
+    if(lastPpmByStudent.length > 0) {
+        if(y > 215) { doc.addPage(); drawHeader("SUMÁRIO EXECUTIVO (CONT.)"); y = 48; }
+        doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...NAVY);
+        doc.text("Classificação de Fluência (última avaliação — Texto Corrido)", 14, y); y += 5;
+
+        const bands = appData.settings.bandsByMode.texto;
+        doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(...GRAY);
+        doc.text(`Faixas adotadas (PPM): Pré-Leitor < ${bands.iniciante} · Leitor Iniciante ${bands.iniciante}–${bands.desenvolvimento-1} · Em Desenvolvimento ${bands.desenvolvimento}–${bands.fluente-1} · Leitor Fluente >= ${bands.fluente}`, 14, y, { maxWidth: 182 });
+        y += 6;
+
+        const classRows = [...lastByMode.texto]
+            .sort((a,b) => b.ppm - a.ppm)
+            .map(e => [e.name, `${e.words}`, `${e.time}s`, `${e.ppm}`, fluencyLevel(e.ppm, 'texto').name]);
+        _tblTitle = 'CLASSIFICAÇÃO DE FLUÊNCIA';
+        doc.autoTable({
+            startY: y, ...TBL_CONT,
+            head: [['Aluno(a)', 'Palavras Lidas', 'Tempo', 'PPM', 'Nível de Fluência']],
+            body: classRows,
+            theme: 'striped',
+            styles: { fontSize: 9 },
+            columnStyles: { 1:{halign:'center'}, 2:{halign:'center'}, 3:{halign:'center'} },
+            headStyles: { fillColor: NAVY },
+            didParseCell: (data) => {
+                if(data.section === 'body' && data.column.index === 4) {
+                    const lvlName = data.cell.raw;
+                    const colors = { 'Pré-Leitor': [239,68,68], 'Leitor Iniciante': [249,115,22], 'Em Desenvolvimento': [202,138,4], 'Leitor Fluente': [34,197,94] };
+                    data.cell.styles.textColor = colors[lvlName] || [0,0,0];
+                    data.cell.styles.fontStyle = 'bold';
+                }
+            }
+        });
+    }
+
+    // --- PÁGINA 2: NOTA METODOLÓGICA ---
+    doc.addPage(); drawHeader("NOTA METODOLÓGICA");
+    y = 50;
+    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
+    const methodText = [
+        "O Bomba de Palavras é um instrumento pedagógico digital de avaliação e desenvolvimento da fluência leitora, criado pelo próprio docente em linguagem web (HTML, CSS e JavaScript) com apoio de Inteligência Artificial Generativa. Foi concebido em alinhamento aos descritores de leitura das avaliações de larga escala (CAED/SAEB) para os anos iniciais do Ensino Fundamental.",
+        "O instrumento opera em três modos complementares, de exigência crescente: (1) Palavras Simples — leitura de palavras frequentes e regulares, aferindo decodificação básica; (2) Palavras Complexas — leitura de palavras de baixa frequência e estruturas silábicas complexas, aferindo decodificação avançada; (3) Texto Corrido — leitura contínua de texto, aferindo fluência contextualizada, no formato mais próximo ao das avaliações externas.",
+        "REGISTRO. Em todos os modos o aluno lê em voz alta sob mediação direta do professor, durante um intervalo cronometrado pelo próprio aplicativo. Nos modos de palavras, o professor avança a cada item lido e o app contabiliza o total. No Texto Corrido, as palavras são numeradas em tela: ao encerrar o tempo o professor toca na última palavra lida, e o número dessa palavra é o total registrado; se o aluno concluir a leitura antes do tempo, o professor encerra a sessão e o app registra o texto integral com o tempo efetivamente decorrido. O registro é, portanto, uma contagem direta e verificável, não uma estimativa."
+    ];
+    methodText.forEach(p => {
+        const lines = doc.splitTextToSize(p, 182);
+        doc.text(lines, 14, y);
+        y += lines.length * 4.6 + 4;
+    });
+
+    // Fórmula do PPM em destaque
+    y += 2;
+    doc.setFillColor(238, 242, 247); doc.setDrawColor(...NAVY); doc.setLineWidth(0.4);
+    doc.rect(14, y, 182, 22, 'FD');
+    doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(...NAVY);
+    doc.text("Cálculo do PPM (palavras por minuto)", 105, y + 7, null, null, "center");
+    doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(...SLATE);
+    doc.text("PPM  =  ( palavras lidas  /  tempo decorrido em segundos )  x  60", 105, y + 16, null, null, "center");
+    y += 28;
+
+    doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(...SLATE);
+    const methodText2 = [
+        "A conversão para PPM permite comparar sessões de durações diferentes (por exemplo, 62s e 90s) numa mesma escala, e comparar entre si os três modos. Por ser uma taxa projetada para o minuto cheio, o PPM quase sempre difere do número de palavras efetivamente lidas — por isso este relatório apresenta sempre as duas medidas lado a lado: a contagem bruta preserva o dado observado em sala, e o PPM viabiliza a leitura estatística e comparativa.",
+        "PESOS E EXIGÊNCIA POR MODO. Cada modo possui faixas próprias de classificação, calibradas segundo sua exigência cognitiva: ler palavras complexas isoladas exige mais por unidade lida do que ler palavras simples, e a leitura de texto contínuo, por se apoiar no contexto, admite taxas mais altas. As faixas abaixo são parametrizáveis pelo docente no próprio aplicativo, permitindo ajuste às referências adotadas pela rede de ensino."
+    ];
+    methodText2.forEach(p => {
+        const lines = doc.splitTextToSize(p, 182);
+        doc.text(lines, 14, y);
+        y += lines.length * 4.6 + 4;
+    });
+
+    // Tabela de faixas por modo
+    const bm = appData.settings.bandsByMode;
+    const bandRows = MODES.map(m => {
+        const b = bm[m];
+        return [modeLabels[m], `< ${b.iniciante}`, `${b.iniciante} a ${b.desenvolvimento-1}`, `${b.desenvolvimento} a ${b.fluente-1}`, `>= ${b.fluente}`];
+    });
+    doc.autoTable({
+        startY: y,
+        head: [['Modo', 'Pré-Leitor', 'Leitor Iniciante', 'Em Desenvolvimento', 'Leitor Fluente']],
+        body: bandRows,
+        theme: 'grid',
+        styles: { fontSize: 9, halign: 'center' },
+        columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } },
+        headStyles: { fillColor: NAVY, fontSize: 8 }
+    });
+    y = doc.lastAutoTable.finalY + 4;
+    doc.setFontSize(8); doc.setFont("helvetica","italic"); doc.setTextColor(...GRAY);
+    doc.text("Valores em PPM. Faixas configuradas no aplicativo no momento da emissão deste relatório.", 14, y);
+    y += 10;
+
+    doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(...SLATE);
+    const methodText3 = [
+        "Os dados de todas as sessões ficam registrados no dispositivo e podem ser exportados em formato aberto (CSV) para análise estatística externa, ou em relatório consolidado (PDF) para uso institucional.",
+        "Este relatório destina-se ao acompanhamento pedagógico e ao replanejamento das mediações docentes. Não substitui as avaliações oficiais da rede; funciona como instrumento formativo complementar, de aplicação contínua ao longo do ano letivo."
+    ];
+    methodText3.forEach(p => {
+        const lines = doc.splitTextToSize(p, 182);
+        doc.text(lines, 14, y);
+        y += lines.length * 4.6 + 4;
+    });
+
+    // --- PÁGINA 3: REGISTRO GERAL DE SESSÕES ---
+    doc.addPage(); drawHeader("REGISTRO GERAL DE SESSÕES");
+    let table1Data = [];
+    appData.students.forEach(st => {
+        const psR = appData.records[st]?.palavras_simples || [];
+        const pcR = appData.records[st]?.palavras_complexas || [];
+        const tR = appData.records[st]?.texto || [];
+        
+        psR.forEach(r => table1Data.push([st, getDM(r.date), 'Pal. Simples', r.score, `${recPpm(r)}`]));
+        pcR.forEach(r => table1Data.push([st, getDM(r.date), 'Pal. Complexas', r.score, `${recPpm(r)}`]));
+        tR.forEach(r => table1Data.push([st, getDM(r.date), 'Texto Corrido', r.score, `${recPpm(r)}`]));
+    });
+    if(table1Data.length > 0) {
+        _tblTitle = 'REGISTRO GERAL DE SESSÕES';
+        doc.autoTable({ startY: 48, ...TBL_CONT, head: [['Aluno(a)', 'Data (D/M)', 'Modo', 'Palavras Lidas', 'PPM']], body: table1Data, theme:'striped', styles: { fontSize: 9 }, headStyles:{fillColor:NAVY} });
+    } else { doc.setFontSize(12); doc.text("Nenhuma partida registrada.", 14, 50); }
+
+    // --- PÁGINA 4: RANKINGS POR MODO ---
+    doc.addPage(); drawHeader("RESULTADOS POR MODO (MELHORES PONTUAÇÕES)");
+    let flatPS = [], flatPC = [], flatT = [];
+    appData.students.forEach(st => {
+        (appData.records[st]?.palavras_simples || []).forEach(r => flatPS.push({name: st, date: getDM(r.date), score: r.score, ppm: recPpm(r)}));
+        (appData.records[st]?.palavras_complexas || []).forEach(r => flatPC.push({name: st, date: getDM(r.date), score: r.score, ppm: recPpm(r)}));
+        (appData.records[st]?.texto || []).forEach(r => flatT.push({name: st, date: getDM(r.date), score: r.score, ppm: recPpm(r)}));
+    });
+    flatPS.sort((a,b) => b.score - a.score); flatPC.sort((a,b) => b.score - a.score); flatT.sort((a,b) => b.score - a.score);
+    
+    let currentY = 48;
+    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...NAVY);
+    _tblTitle = 'RESULTADOS POR MODO'; doc.text("MODO: PALAVRAS SIMPLES", 14, currentY); currentY += 5;
+    if(flatPS.length > 0) {
+        doc.autoTable({ startY: currentY, head: [['Pos', 'Aluno', 'Data', 'Palavras Lidas', 'PPM']], body: flatPS.map((r,i)=>[i+1, r.name, r.date, r.score, r.ppm]), theme:'grid', styles:{fontSize:9}, headStyles:{fillColor:[59,130,246]}, ...TBL_CONT });
+        currentY = doc.lastAutoTable.finalY + 12;
+    } else { currentY += 10; }
+
+    if(currentY > 230) { doc.addPage(); drawHeader("RESULTADOS POR MODO (CONT.)"); currentY = 48; }
+    doc.setTextColor(...NAVY); doc.text("MODO: PALAVRAS COMPLEXAS", 14, currentY); currentY += 5;
+    if(flatPC.length > 0) {
+        doc.autoTable({ startY: currentY, head: [['Pos', 'Aluno', 'Data', 'Palavras Lidas', 'PPM']], body: flatPC.map((r,i)=>[i+1, r.name, r.date, r.score, r.ppm]), theme:'grid', styles:{fontSize:9}, headStyles:{fillColor:[168,85,247]}, ...TBL_CONT });
+        currentY = doc.lastAutoTable.finalY + 12;
+    } else { currentY += 10; }
+
+    if(currentY > 230) { doc.addPage(); drawHeader("RESULTADOS POR MODO (CONT.)"); currentY = 48; }
+    doc.setTextColor(...NAVY); doc.text("MODO: TEXTO CORRIDO", 14, currentY); currentY += 5;
+    if(flatT.length > 0) {
+        doc.autoTable({ startY: currentY, head: [['Pos', 'Aluno', 'Data', 'Palavras Lidas', 'PPM']], body: flatT.map((r,i)=>[i+1, r.name, r.date, r.score, r.ppm]), theme:'grid', styles:{fontSize:9}, headStyles:{fillColor:[249,115,22]}, ...TBL_CONT });
+    }
+
+    // --- PÁGINA 5: DADOS GRÁFICOS DA TURMA ---
+    doc.addPage(); drawHeader("EVOLUÇÃO DA TURMA — 1ª vs ÚLTIMA AVALIAÇÃO");
+    
+    let labels = [], psFirst = [], psLast = [], pcFirst = [], pcLast = [], tFirst = [], tLast = [];
+    appData.students.forEach(st => {
+        labels.push(st);
+        let psR = appData.records[st]?.palavras_simples || [];
+        let pcR = appData.records[st]?.palavras_complexas || [];
+        let tR = appData.records[st]?.texto || [];
+        
+        psFirst.push(psR.length > 0 ? psR[0].score : 0); psLast.push(psR.length > 0 ? psR[psR.length-1].score : 0);
+        pcFirst.push(pcR.length > 0 ? pcR[0].score : 0); pcLast.push(pcR.length > 0 ? pcR[pcR.length-1].score : 0);
+        tFirst.push(tR.length > 0 ? tR[0].score : 0); tLast.push(tR.length > 0 ? tR[tR.length-1].score : 0);
+    });
+
+    const createChart = (id, title, dFirst, dLast, colFirst, colLast) => {
+        let cnv = document.getElementById(id);
+        let chart = new Chart(cnv.getContext('2d'), {
+            type: 'bar',
+            data: { labels, datasets: [{label:'1ª Avaliação', data:dFirst, backgroundColor:colFirst, borderRadius: 3}, {label:'Última Avaliação', data:dLast, backgroundColor:colLast, borderRadius: 3}] },
+            options: { ...PDF_CHART_OPTS, plugins: { ...PDF_CHART_OPTS.plugins, title: { display: true, text: title, color: '#1c3d6e', font: { size: 16, weight: 'bold' } } } },
+            plugins: [whiteBgPlugin]
+        });
+        let img = cnv.toDataURL('image/jpeg', 0.95);
+        chart.destroy(); return img;
+    };
+
+    doc.addImage(createChart('c1', 'Palavras Simples — palavras lidas', psFirst, psLast, '#93c5fd', '#2563eb'), 'JPEG', 14, 46, 182, 76);
+    doc.addImage(createChart('c2', 'Palavras Complexas — palavras lidas', pcFirst, pcLast, '#d8b4fe', '#9333ea'), 'JPEG', 14, 126, 182, 76);
+    doc.addImage(createChart('c3', 'Texto Corrido — palavras lidas', tFirst, tLast, '#fdba74', '#ea580c'), 'JPEG', 14, 206, 182, 76);
+
+    // --- SEÇÃO DE FLUÊNCIA POR MODO (uma página para cada um dos três modos) ---
+    const ppmCanvasByMode = { palavras_simples: 'cPpmPS', palavras_complexas: 'cPpmPC', texto: 'cPpm' };
+    MODES.forEach(m => {
+        const entries = lastByMode[m];
+        if(entries.length === 0) return;
+
+        doc.addPage(); drawHeader(`FLUÊNCIA DA TURMA — ${modeLabels[m].toUpperCase()}`);
+        const bands = appData.settings.bandsByMode[m];
+        const sorted = [...entries].sort((a,b) => b.ppm - a.ppm);
+
+        const cnvP = document.getElementById(ppmCanvasByMode[m]);
+        const chartP = new Chart(cnvP.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: sorted.map(e => e.name),
+                datasets: [
+                    { label: 'Palavras lidas', data: sorted.map(e => e.words), backgroundColor: '#94a3b8', borderRadius: 3 },
+                    { label: 'PPM (classificado por cor)', data: sorted.map(e => e.ppm), backgroundColor: sorted.map(e => fluencyLevel(e.ppm, m).color), borderRadius: 3 }
+                ]
+            },
+            options: { ...PDF_CHART_OPTS, indexAxis: 'y', plugins: { ...PDF_CHART_OPTS.plugins, title: { display: true, text: 'Última avaliação — palavras lidas e PPM', color: '#1c3d6e', font: { size: 16, weight: 'bold' } } } },
+            plugins: [whiteBgPlugin]
+        });
+        doc.addImage(cnvP.toDataURL('image/jpeg', 0.95), 'JPEG', 14, 46, 182, 80); chartP.destroy();
+
+        // Legenda das faixas, em duas colunas
+        let yL = 136;
+        doc.setFontSize(9); doc.setFont("helvetica", "bold");
+        doc.setTextColor(239,68,68);  doc.text(`Pré-Leitor: < ${bands.iniciante} PPM`, 20, yL);
+        doc.setTextColor(249,115,22); doc.text(`Leitor Iniciante: ${bands.iniciante}–${bands.desenvolvimento-1} PPM`, 110, yL);
+        yL += 6;
+        doc.setTextColor(202,138,4);  doc.text(`Em Desenvolvimento: ${bands.desenvolvimento}–${bands.fluente-1} PPM`, 20, yL);
+        doc.setTextColor(34,197,94);  doc.text(`Leitor Fluente: >= ${bands.fluente} PPM`, 110, yL);
+        doc.setTextColor(0,0,0);
+        yL += 8;
+
+        // Tabela do modo com as duas medidas
+        _tblTitle = `FLUÊNCIA — ${modeLabels[m].toUpperCase()}`;
+        doc.autoTable({
+            startY: yL, ...TBL_CONT,
+            head: [['Aluno(a)', 'Palavras Lidas', 'Tempo', 'PPM', 'Nível de Fluência']],
+            body: sorted.map(e => [e.name, `${e.words}`, `${e.time}s`, `${e.ppm}`, fluencyLevel(e.ppm, m).name]),
+            theme: 'striped',
+            styles: { fontSize: 9 },
+            columnStyles: { 1:{halign:'center'}, 2:{halign:'center'}, 3:{halign:'center'} },
+            headStyles: { fillColor: modeColors[m] },
+            didParseCell: (data) => {
+                if(data.section === 'body' && data.column.index === 4) {
+                    const colors = { 'Pré-Leitor': [239,68,68], 'Leitor Iniciante': [249,115,22], 'Em Desenvolvimento': [202,138,4], 'Leitor Fluente': [34,197,94] };
+                    data.cell.styles.textColor = colors[data.cell.raw] || [0,0,0];
+                    data.cell.styles.fontStyle = 'bold';
+                }
+            }
+        });
+    });
+
+    // --- PÁGINAS INDIVIDUAIS POR ALUNO ---
+    appData.students.forEach((st) => {
+        const psR = appData.records[st]?.palavras_simples || [];
+        const pcR = appData.records[st]?.palavras_complexas || [];
+        const tR = appData.records[st]?.texto || [];
+        if(psR.length === 0 && pcR.length === 0 && tR.length === 0) return;
+        
+        doc.addPage(); drawHeader(`DESENVOLVIMENTO INDIVIDUAL: ${st}`);
+
+        // Síntese do aluno — situação atual nos três modos, com as duas medidas
+        let sy = 48;
+        const byMode = { palavras_simples: psR, palavras_complexas: pcR, texto: tR };
+        const synthRows = MODES.filter(m => byMode[m].length > 0).map(m => {
+            const recs = byMode[m], last = recs[recs.length-1], first = recs[0];
+            const ppmNow = recPpm(last);
+            let evo = '—';
+            if(recs.length >= 2 && first.score > 0) {
+                const pct = Math.round(((last.score - first.score) / first.score) * 100);
+                evo = `${pct >= 0 ? '+' : ''}${pct}%  (${first.score} para ${last.score})`;
+            }
+            return [modeLabels[m], `${last.score}`, `${last.timeTaken}s`, `${ppmNow}`, fluencyLevel(ppmNow, m).name, evo];
+        });
+        doc.autoTable({
+            startY: sy,
+            head: [['Modo', 'Palavras Lidas', 'Tempo', 'PPM', 'Nível de Fluência', 'Evolução']],
+            body: synthRows,
+            theme: 'grid',
+            styles: { fontSize: 8.5 },
+            columnStyles: { 0:{fontStyle:'bold'}, 1:{halign:'center'}, 2:{halign:'center'}, 3:{halign:'center'}, 5:{halign:'center'} },
+            headStyles: { fillColor: NAVY, fontSize: 8 },
+            didParseCell: (data) => {
+                if(data.section === 'body' && data.column.index === 4) {
+                    const colors = { 'Pré-Leitor': [239,68,68], 'Leitor Iniciante': [249,115,22], 'Em Desenvolvimento': [202,138,4], 'Leitor Fluente': [34,197,94] };
+                    data.cell.styles.textColor = colors[data.cell.raw] || [0,0,0];
+                    data.cell.styles.fontStyle = 'bold';
+                }
+            }
+        });
+        sy = doc.lastAutoTable.finalY + 5;
+        doc.setFontSize(8); doc.setFont("helvetica","italic"); doc.setTextColor(...GRAY);
+        doc.text(`Sessões realizadas — Simples: ${psR.length} · Complexas: ${pcR.length} · Texto: ${tR.length}. Evolução calculada sobre palavras lidas (1ª vs última sessão).`, 14, sy, { maxWidth: 182 });
+        sy += 8;
+
+        // Gráfico no mesmo modelo da EVOLUÇÃO DA TURMA: barras 1ª vs última, por modo
+        const indLabels = [], indFirst = [], indLast = [], indColorsF = [], indColorsL = [];
+        const palette = { palavras_simples: ['#93c5fd','#2563eb'], palavras_complexas: ['#d8b4fe','#9333ea'], texto: ['#fdba74','#ea580c'] };
+        MODES.forEach(m => {
+            const recs = byMode[m];
+            indLabels.push(modeLabels[m]);
+            indFirst.push(recs.length > 0 ? recs[0].score : 0);
+            indLast.push(recs.length > 0 ? recs[recs.length-1].score : 0);
+            indColorsF.push(palette[m][0]); indColorsL.push(palette[m][1]);
+        });
+
+        const cnvS = document.getElementById('cStudent');
+        const chartS = new Chart(cnvS.getContext('2d'), {
+            type: 'bar',
+            data: { labels: indLabels, datasets: [
+                { label: '1ª Avaliação', data: indFirst, backgroundColor: indColorsF, borderRadius: 3 },
+                { label: 'Última Avaliação', data: indLast, backgroundColor: indColorsL, borderRadius: 3 }
+            ]},
+            options: { ...PDF_CHART_OPTS, plugins: { ...PDF_CHART_OPTS.plugins, title: { display: true, text: 'Palavras lidas por modo — 1ª vs última avaliação', color: '#1c3d6e', font: { size: 15, weight: 'bold' } } } },
+            plugins: [whiteBgPlugin]
+        });
+        doc.addImage(cnvS.toDataURL('image/jpeg', 0.95), 'JPEG', 14, sy, 182, 74); chartS.destroy();
+        
+        let sY = sy + 82;
+        doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(...NAVY); doc.text("Histórico Recente (últimas 5 sessões por modo)", 14, sY); sY+=4;
+        
+        const buildTab = (records, mode) => {
+            let slice = records.slice(-5);
+            return slice.map((r, idx) => [`#${records.length - slice.length + idx + 1}`, r.date, mode, r.score, `${r.timeTaken}s`, recPpm(r)]);
+        };
+        
+        let indTab = [...buildTab(psR, 'Simples'), ...buildTab(pcR, 'Complexas'), ...buildTab(tR, 'Texto')];
+        if(indTab.length > 0) {
+            doc.autoTable({ startY: sY, head: [['Sessão', 'Data', 'Modo', 'Palavras', 'Tempo', 'PPM']], body: indTab, theme:'grid', styles:{fontSize:8}, headStyles:{fillColor:NAVY} });
+        }
+    });
+
+    // --- PÁGINA FINAL: VALIDAÇÃO PEDAGÓGICA ---
+    doc.addPage(); drawHeader("VALIDAÇÃO PEDAGÓGICA");
+
+    let yv = 52;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(...SLATE);
+    doc.text("Declaramos que os dados apresentados neste relatório foram coletados por meio do instrumento pedagógico Bomba de Palavras, em sessões de avaliação de fluência leitora conduzidas sob mediação docente, e destinam-se ao acompanhamento pedagógico dos estudantes e ao planejamento das intervenções de ensino.", 14, yv, { maxWidth: 182 });
+
+    let ySign = 120;
+    doc.setDrawColor(...SLATE); doc.setLineWidth(0.4);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.setTextColor(0,0,0);
+
+    doc.line(40, ySign, 170, ySign);
+    doc.text(`Professor(a): ${teacher}`, 105, ySign+7, null, null, "center");
+    doc.setFontSize(8); doc.setTextColor(...GRAY); doc.text("Responsável pela aplicação", 105, ySign+12, null, null, "center");
+    
+    ySign += 45;
+    doc.setFontSize(11); doc.setTextColor(0,0,0);
+    doc.line(40, ySign, 170, ySign); doc.text("Orientação Pedagógica", 105, ySign+7, null, null, "center");
+    
+    ySign += 45;
+    doc.line(40, ySign, 170, ySign); doc.text("Gestão Escolar", 105, ySign+7, null, null, "center");
+
+    doc.setFontSize(9); doc.setTextColor(...GRAY);
+    doc.text(`Local e data: ____________________________, ______ de ______________ de ________`, 105, ySign+35, null, null, "center");
+
+    drawFooters();
+    doc.save(`Relatorio_BombaDePalavras_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+</script>
+<script>if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(function(){});</script>
+</body>
+</html>
