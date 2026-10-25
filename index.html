@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-title" content="Bomba de Palavras">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -147,31 +147,39 @@
                 </div>
                 <div class="glass-panel p-4 rounded-xl space-y-3 text-sm">
                     <label class="block text-sm font-bold text-cyan-300 border-b border-slate-700 pb-1">Faixas de Fluência (PPM)</label>
-                    <p class="text-[10px] text-slate-400 leading-snug">Limites de classificação por modo. Cada modo tem sua própria referência, pois o número de palavras lidas varia com a dificuldade.</p>
+                    <label class="flex justify-between items-center bg-slate-900/60 border border-cyan-500/40 rounded-lg px-3 py-2">
+                        <span class="font-black text-cyan-200 text-xs uppercase tracking-wide">Adaptação/Inclusão</span>
+                        <input type="checkbox" id="cfg-inclusion" class="w-5 h-5 accent-cyan-500" onchange="applyInclusionUI()">
+                    </label>
+                    <p id="band-hint" class="text-[10px] text-slate-400 leading-snug">Limites de classificação por modo. Cada modo tem sua própria referência, pois o número de palavras lidas varia com a dificuldade.</p>
+                    <p id="incl-hint" class="hidden text-[10px] text-cyan-200/80 leading-snug">Modo adaptado ativo: em vez dos três níveis, cada modo tem um único objetivo (PPM) definido pelo professor. Desative para voltar à classificação padrão.</p>
 
                     <div class="space-y-1">
                         <span class="text-[11px] font-black text-blue-400 uppercase">Palavras Simples</span>
-                        <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
+                        <div class="grid grid-cols-3 gap-2 text-center text-[10px] band-grid">
                             <div><label class="block text-orange-300 font-bold mb-1">Inic. ≥</label><input type="number" id="cfg-band-ps-ini" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
                             <div><label class="block text-yellow-300 font-bold mb-1">Desenv. ≥</label><input type="number" id="cfg-band-ps-dev" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
                             <div><label class="block text-green-300 font-bold mb-1">Fluente ≥</label><input type="number" id="cfg-band-ps-flu" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
                         </div>
+                        <div class="goal-box hidden"><label class="block text-cyan-300 font-bold mb-1 text-[10px]">Objetivo (PPM)</label><input type="number" id="cfg-goal-ps" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-cyan-500 font-bold text-lg"></div>
                     </div>
                     <div class="space-y-1">
                         <span class="text-[11px] font-black text-purple-400 uppercase">Palavras Complexas</span>
-                        <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
+                        <div class="grid grid-cols-3 gap-2 text-center text-[10px] band-grid">
                             <div><label class="block text-orange-300 font-bold mb-1">Inic. ≥</label><input type="number" id="cfg-band-pc-ini" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
                             <div><label class="block text-yellow-300 font-bold mb-1">Desenv. ≥</label><input type="number" id="cfg-band-pc-dev" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
                             <div><label class="block text-green-300 font-bold mb-1">Fluente ≥</label><input type="number" id="cfg-band-pc-flu" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
                         </div>
+                        <div class="goal-box hidden"><label class="block text-cyan-300 font-bold mb-1 text-[10px]">Objetivo (PPM)</label><input type="number" id="cfg-goal-pc" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-cyan-500 font-bold text-lg"></div>
                     </div>
                     <div class="space-y-1">
                         <span class="text-[11px] font-black text-orange-400 uppercase">Texto Corrido</span>
-                        <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
+                        <div class="grid grid-cols-3 gap-2 text-center text-[10px] band-grid">
                             <div><label class="block text-orange-300 font-bold mb-1">Inic. ≥</label><input type="number" id="cfg-band-tx-ini" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
                             <div><label class="block text-yellow-300 font-bold mb-1">Desenv. ≥</label><input type="number" id="cfg-band-tx-dev" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
                             <div><label class="block text-green-300 font-bold mb-1">Fluente ≥</label><input type="number" id="cfg-band-tx-flu" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-slate-600 font-bold"></div>
                         </div>
+                        <div class="goal-box hidden"><label class="block text-cyan-300 font-bold mb-1 text-[10px]">Objetivo (PPM)</label><input type="number" id="cfg-goal-tx" min="1" class="w-full bg-slate-900 text-white text-center rounded p-2 border border-cyan-500 font-bold text-lg"></div>
                     </div>
                 </div>
                 <div class="flex gap-2">
@@ -197,11 +205,11 @@
             <div id="tab-palavras" class="tab-content hidden h-full">
                 <div class="flex flex-col gap-4 h-full">
                     <div class="glass-panel p-3 rounded-xl flex flex-col flex-1">
-                        <label class="block text-sm font-bold mb-1 text-blue-300">Palavras Simples</label>
+                        <div class="flex justify-between items-center mb-1"><label class="block text-sm font-bold text-blue-300">Palavras Simples</label><button type="button" onclick="resetDefault('simple')" class="text-[10px] font-bold bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">Restaurar padrão</button></div>
                         <textarea id="cfg-words-simple" class="flex-1 w-full bg-slate-900/80 text-white rounded-xl p-2 border border-slate-600 resize-none text-xs leading-relaxed"></textarea>
                     </div>
                     <div class="glass-panel p-3 rounded-xl flex flex-col flex-1">
-                        <label class="block text-sm font-bold mb-1 text-purple-300">Palavras Complexas</label>
+                        <div class="flex justify-between items-center mb-1"><label class="block text-sm font-bold text-purple-300">Palavras Complexas</label><button type="button" onclick="resetDefault('complex')" class="text-[10px] font-bold bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">Restaurar padrão</button></div>
                         <textarea id="cfg-words-complex" class="flex-1 w-full bg-slate-900/80 text-white rounded-xl p-2 border border-slate-600 resize-none text-xs leading-relaxed"></textarea>
                     </div>
                 </div>
@@ -213,7 +221,7 @@
                     <input type="number" id="cfg-text-time" min="10" max="300" class="w-20 bg-slate-900 text-white text-center rounded p-2 border border-orange-500 font-bold">
                 </div>
                 <div class="glass-panel p-4 rounded-xl flex flex-col flex-1">
-                    <label class="block text-sm font-bold mb-2 text-orange-300">Texto Contínuo (CAED)</label>
+                    <div class="flex justify-between items-center mb-2"><label class="block text-sm font-bold text-orange-300">Texto Contínuo (CAED)</label><button type="button" onclick="resetDefault('text')" class="text-[10px] font-bold bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">Restaurar padrão</button></div>
                     <textarea id="cfg-text" class="flex-1 w-full bg-slate-900/80 text-white rounded-xl p-3 border border-slate-600 resize-none text-sm leading-relaxed"></textarea>
                 </div>
             </div>
@@ -304,9 +312,11 @@
 
 <script>
 /** INFRA & STATE */
-const defaultWordsSimple = "casa, bola, menino, escola, sapato, gato, pato, livro, mesa, porta, janela, carro, rua, flor, sol, lua";
-const defaultWordsComplex = "paralelepípedo, inconstitucional, otorrinolaringologista, imprescindível, exceção, excentricidade, perspicaz, idiossincrasia, inexorável, plenipotenciário, estupefato";
-const defaultText = "O menino abriu a porta e viu o pequeno gato brincando com a bola de lã na rua iluminada pelo sol. Era uma manhã muito tranquila e ele decidiu ler um livro debaixo da árvore da escola.";
+const defaultWordsSimple = "leitura, ensino, saber, matriz, prova, turma, ciclo, fase, meta, plano, curso, base, pauta, nota, teste, dados, valor, texto, livro, regra, autor, moral, lenda, vigor, papel, nobre, ritmo, norma, ética, classe, senso, pleno, comum, vital, focar, guia, foco, eixo, grau, tema, item, aula, arte, rigor, prumo, meio, lousa, fala, voz, som, letra, frase, verso, rima, conto, mito, herói, vilão, ação, trama, perfil, verbo, modo, tempo, forma, caso, nexo, uso, dom, par, raiz, sufixo, sigla, sinal, aspas, chave, painel, edital, banca, gabarito";
+const defaultWordsComplex = "fluência, cognição, diretriz, sintaxe, contexto, métrica, coesão, premissa, discente, vigente, abstrair, reflexo, empírico, essência, alínea, endosso, inerente, preceito, equidade, léxico, inferir, fonema, regência, viés, dialética, rubrica, emenda, portaria, parecer, docente, escopo, síntese, lúdico, arguir, evocar, deduzir, induzir, lacuna, proficiência, outorga, currículo, grafema, semântica, fonética, prosódia, didática, exegese, analogia, apólogo, epígrafe, catarse, epílogo, sinopse, elipse, prólogo, retórica, pragmática, fluidez, descritor, redigir, revisar, avalizar, mitigar, inferência, cognato, apelo, nuance, latente, tangível, vanguarda, holístico, intrínseco, uníssono, verbete, minúcia, anexo, acervo, fomento, adendo, clivagem";
+const defaultText = "O Relógio de Giz\n\nNaquela tarde, a sala dos professores estava mergulhada em um silêncio raro. Sobre a mesa central, um pequeno relógio de bolso, esquecido por algum colega, marcava o tempo com um tique-taque ritmado. Marina, professora há duas décadas, observava o objeto. Ele não tinha ponteiros comuns; no lugar das horas, haviam palavras: \"agora\", \"depois\", \"sempre\", \"nunca\".\nMovida pela curiosidade, ela tocou o mostrador. De repente, o barulho do pátio invadiu a sala. Eram risadas, passos apressados, o eco de giz batendo na lousa verde. O relógio não media o tempo cronológico, mas sim o tempo de aprendizagem dentro da escola. Cada palavra no mostrador guardava um instante exato da descoberta de um aluno.\nMarina sorriu, compreendendo o segredo. O verdadeiro ritmo da educação não se mede em minutos, mas nos saltos de leitura e nas histórias compartilhadas. Fechou o relógio com cuidado e o devolveu à mesa. Quando o sinal bateu, ela não caminhou apressada. Foi ao encontro do seu \"agora\", sabendo que cada palavra lida ecoaria para o \"sempre\".";
+// Listas de exemplo das versões anteriores: se ainda estiverem intactas, são trocadas pelas novas (listas editadas pelo professor nunca são tocadas)
+const legacyDefaults = { simple: "casa, bola, menino, escola, sapato, gato, pato, livro, mesa, porta, janela, carro, rua, flor, sol, lua", complex: "paralelepípedo, inconstitucional, otorrinolaringologista, imprescindível, exceção, excentricidade, perspicaz, idiossincrasia, inexorável, plenipotenciário, estupefato", text: "O menino abriu a porta e viu o pequeno gato brincando com a bola de lã na rua iluminada pelo sol. Era uma manhã muito tranquila e ele decidiu ler um livro debaixo da árvore da escola." };
 
 let appData = JSON.parse(localStorage.getItem('bombaDataCAED')) || {};
 
@@ -319,9 +329,17 @@ if(appData.settings.words && !appData.settings.wordsSimple) {
 if(!appData.settings.wordsSimple) appData.settings.wordsSimple = defaultWordsSimple;
 if(!appData.settings.wordsComplex) appData.settings.wordsComplex = defaultWordsComplex;
 if(!appData.settings.text) appData.settings.text = defaultText;
+if(appData.settings.wordsSimple === legacyDefaults.simple) appData.settings.wordsSimple = defaultWordsSimple;
+if(appData.settings.wordsComplex === legacyDefaults.complex) appData.settings.wordsComplex = defaultWordsComplex;
+if(appData.settings.text === legacyDefaults.text) appData.settings.text = defaultText;
 
 if(!appData.students) appData.students = [];
 if(!appData.records) appData.records = {};
+// Jogador de teste: criado uma única vez em instalações novas (sem alunos). Dados já existentes não são alterados.
+if(!appData.settings.seededTeste) {
+    if(appData.students.length === 0) appData.students.push('TESTE');
+    appData.settings.seededTeste = true;
+}
 
 // Faixas de referência de fluência (PPM) por modo — editáveis no Painel do Professor
 const defaultBands = {
@@ -339,7 +357,22 @@ if(!appData.settings.bandsByMode) {
     if(!appData.settings.bandsByMode[m]) appData.settings.bandsByMode[m] = { ...defaultBands[m] };
 });
 
+// Modo Adaptação/Inclusão: um único objetivo (PPM) por modo no lugar dos três níveis
+const defaultGoals = { palavras_simples: 20, palavras_complexas: 12, texto: 30 };
+function normalizeInclusion() {
+    const st = appData.settings;
+    st.inclusion = st.inclusion === true;
+    if(!st.goalsByMode) st.goalsByMode = {};
+    ['palavras_simples','palavras_complexas','texto'].forEach(m => { if(!(st.goalsByMode[m] > 0)) st.goalsByMode[m] = defaultGoals[m]; });
+}
+normalizeInclusion();
+const isIncl = () => appData.settings.inclusion === true;
+const goalOf = m => appData.settings.goalsByMode[m];
+
 function fluencyLevel(ppm, mode = 'texto') {
+    if(isIncl()) return ppm >= goalOf(mode)
+        ? { name: 'Objetivo Alcançado', color: '#22c55e', idx: 3 }
+        : { name: 'Rumo ao Objetivo',   color: '#f97316', idx: 1 };
     const b = (appData.settings.bandsByMode && appData.settings.bandsByMode[mode]) || defaultBands[mode];
     if(ppm < b.iniciante)        return { name: 'Pré-Leitor',          color: '#ef4444', idx: 0 };
     if(ppm < b.desenvolvimento)  return { name: 'Leitor Iniciante',    color: '#f97316', idx: 1 };
@@ -589,6 +622,11 @@ function loadSettingsUI() {
     document.getElementById('cfg-fs').checked = appData.settings.fs;
     document.getElementById('cfg-snd-f').checked = appData.settings.sndF;
     document.getElementById('cfg-snd-e').checked = appData.settings.sndE;
+    document.getElementById('cfg-inclusion').checked = isIncl();
+    document.getElementById('cfg-goal-ps').value = goalOf('palavras_simples');
+    document.getElementById('cfg-goal-pc').value = goalOf('palavras_complexas');
+    document.getElementById('cfg-goal-tx').value = goalOf('texto');
+    applyInclusionUI();
     const bm = appData.settings.bandsByMode;
     document.getElementById('cfg-band-ps-ini').value = bm.palavras_simples.iniciante;
     document.getElementById('cfg-band-ps-dev').value = bm.palavras_simples.desenvolvimento;
@@ -599,6 +637,20 @@ function loadSettingsUI() {
     document.getElementById('cfg-band-tx-ini').value = bm.texto.iniciante;
     document.getElementById('cfg-band-tx-dev').value = bm.texto.desenvolvimento;
     document.getElementById('cfg-band-tx-flu').value = bm.texto.fluente;
+}
+
+function applyInclusionUI() {
+    const on = document.getElementById('cfg-inclusion').checked;
+    document.querySelectorAll('.band-grid').forEach(e => e.classList.toggle('hidden', on));
+    document.querySelectorAll('.goal-box').forEach(e => e.classList.toggle('hidden', !on));
+    document.getElementById('band-hint').classList.toggle('hidden', on);
+    document.getElementById('incl-hint').classList.toggle('hidden', !on);
+}
+
+function resetDefault(which) {
+    if(!confirm('Restaurar o conteúdo padrão? O que está escrito aqui será substituído (só vale depois de Salvar e Sair).')) return;
+    const m = { simple: ['cfg-words-simple', defaultWordsSimple], complex: ['cfg-words-complex', defaultWordsComplex], text: ['cfg-text', defaultText] }[which];
+    document.getElementById(m[0]).value = m[1];
 }
 
 function saveSettings() {
@@ -616,6 +668,12 @@ function saveSettings() {
         palavras_simples:   { iniciante: gi('cfg-band-ps-ini',25), desenvolvimento: gi('cfg-band-ps-dev',50), fluente: gi('cfg-band-ps-flu',75) },
         palavras_complexas: { iniciante: gi('cfg-band-pc-ini',18), desenvolvimento: gi('cfg-band-pc-dev',36), fluente: gi('cfg-band-pc-flu',55) },
         texto:              { iniciante: gi('cfg-band-tx-ini',40), desenvolvimento: gi('cfg-band-tx-dev',75), fluente: gi('cfg-band-tx-flu',100) }
+    };
+    appData.settings.inclusion = document.getElementById('cfg-inclusion').checked;
+    appData.settings.goalsByMode = {
+        palavras_simples:   gi('cfg-goal-ps', defaultGoals.palavras_simples),
+        palavras_complexas: gi('cfg-goal-pc', defaultGoals.palavras_complexas),
+        texto:              gi('cfg-goal-tx', defaultGoals.texto)
     };
     saveDB();
     if(!document.fullscreenElement && appData.settings.fs) document.documentElement.requestFullscreen().catch(()=>{});
@@ -669,7 +727,7 @@ function restoreBackup(e) {
                 delete imported.settings.words;
                 imported.settings.wordsComplex = defaultWordsComplex;
             }
-            appData = imported; saveDB(); alert('Backup carregado com sucesso!'); loadSettingsUI(); 
+            imported.settings.seededTeste = true; appData = imported; normalizeInclusion(); saveDB(); alert('Backup carregado com sucesso!'); loadSettingsUI(); 
         } catch(err){ alert('Arquivo inválido!'); } 
     }; reader.readAsText(file);
 }
@@ -904,7 +962,7 @@ function showResults(score, timeTaken) {
     document.getElementById('res-time-lbl').innerText = `em ${rec.timeTaken}s (Limite: ${sys.totalTime}s)`;
     document.getElementById('res-ppm').innerText = rec.ppm;
     const lvl = fluencyLevel(rec.ppm, sys.mode);
-    document.getElementById('res-level').innerText = lvl.name;
+    document.getElementById('res-level').innerHTML = isIncl() ? `${lvl.name}<span class="block text-xs text-slate-300 font-bold mt-1">Objetivo: ${goalOf(sys.mode)} PPM</span>` : lvl.name;
     document.getElementById('res-level').style.color = lvl.color;
 
     const res = document.getElementById('screen-results'); res.classList.remove('hidden'); res.classList.add('flex');
@@ -937,6 +995,9 @@ function renderReports() {
     if(st) {
         const counts = [0,0,0,0];
         lastPpms.forEach(p => counts[fluencyLevel(p, 'texto').idx]++);
+        const levelBoxes = isIncl()
+            ? `<div class="flex-1 bg-orange-500/20 text-orange-400 rounded py-1">Rumo ao objetivo: ${counts[1]}</div><div class="flex-1 bg-green-500/20 text-green-400 rounded py-1">Objetivo alcançado (${goalOf('texto')} PPM): ${counts[3]}</div>`
+            : `<div class="flex-1 bg-red-500/20 text-red-400 rounded py-1">Pré: ${counts[0]}</div><div class="flex-1 bg-orange-500/20 text-orange-400 rounded py-1">Inic: ${counts[1]}</div><div class="flex-1 bg-yellow-500/20 text-yellow-400 rounded py-1">Des: ${counts[2]}</div><div class="flex-1 bg-green-500/20 text-green-400 rounded py-1">Flu: ${counts[3]}</div>`;
         summaryHtml = `
         <div class="glass-panel p-4 rounded-xl border border-cyan-500/30 mb-1">
             <h4 class="font-black text-cyan-400 uppercase text-sm mb-2 tracking-widest">Turma — PPM (Texto, última aval.)</h4>
@@ -946,12 +1007,7 @@ function renderReports() {
                 <div class="bg-slate-900 rounded p-2"><span class="block text-slate-400 text-[9px] uppercase">Mín</span><span class="font-black text-white text-lg">${st.min}</span></div>
                 <div class="bg-slate-900 rounded p-2"><span class="block text-slate-400 text-[9px] uppercase">Máx</span><span class="font-black text-white text-lg">${st.max}</span></div>
             </div>
-            <div class="flex gap-1 text-[9px] font-bold text-center">
-                <div class="flex-1 bg-red-500/20 text-red-400 rounded py-1">Pré: ${counts[0]}</div>
-                <div class="flex-1 bg-orange-500/20 text-orange-400 rounded py-1">Inic: ${counts[1]}</div>
-                <div class="flex-1 bg-yellow-500/20 text-yellow-400 rounded py-1">Des: ${counts[2]}</div>
-                <div class="flex-1 bg-green-500/20 text-green-400 rounded py-1">Flu: ${counts[3]}</div>
-            </div>
+            <div class="flex gap-1 text-[9px] font-bold text-center">${levelBoxes}</div>
         </div>`;
     }
 
@@ -1165,7 +1221,8 @@ async function exportFullReportPDF() {
 
         const bands = appData.settings.bandsByMode.texto;
         doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(...GRAY);
-        doc.text(`Faixas adotadas (PPM): Pré-Leitor < ${bands.iniciante} · Leitor Iniciante ${bands.iniciante}–${bands.desenvolvimento-1} · Em Desenvolvimento ${bands.desenvolvimento}–${bands.fluente-1} · Leitor Fluente >= ${bands.fluente}`, 14, y, { maxWidth: 182 });
+        if(isIncl()) doc.text(`Modo Adaptação/Inclusão: objetivo definido pelo professor para o Texto Corrido = ${goalOf('texto')} PPM. Classificação: Objetivo Alcançado (>= ${goalOf('texto')}) ou Rumo ao Objetivo (< ${goalOf('texto')}).`, 14, y, { maxWidth: 182 });
+        else doc.text(`Faixas adotadas (PPM): Pré-Leitor < ${bands.iniciante} · Leitor Iniciante ${bands.iniciante}–${bands.desenvolvimento-1} · Em Desenvolvimento ${bands.desenvolvimento}–${bands.fluente-1} · Leitor Fluente >= ${bands.fluente}`, 14, y, { maxWidth: 182 });
         y += 6;
 
         const classRows = [...lastByMode.texto]
@@ -1183,7 +1240,7 @@ async function exportFullReportPDF() {
             didParseCell: (data) => {
                 if(data.section === 'body' && data.column.index === 4) {
                     const lvlName = data.cell.raw;
-                    const colors = { 'Pré-Leitor': [239,68,68], 'Leitor Iniciante': [249,115,22], 'Em Desenvolvimento': [202,138,4], 'Leitor Fluente': [34,197,94] };
+                    const colors = { 'Pré-Leitor': [239,68,68], 'Leitor Iniciante': [249,115,22], 'Em Desenvolvimento': [202,138,4], 'Leitor Fluente': [34,197,94], 'Rumo ao Objetivo': [249,115,22], 'Objetivo Alcançado': [34,197,94] };
                     data.cell.styles.textColor = colors[lvlName] || [0,0,0];
                     data.cell.styles.fontStyle = 'bold';
                 }
@@ -1229,13 +1286,13 @@ async function exportFullReportPDF() {
 
     // Tabela de faixas por modo
     const bm = appData.settings.bandsByMode;
-    const bandRows = MODES.map(m => {
+    const bandRows = isIncl() ? MODES.map(m => [modeLabels[m], `>= ${goalOf(m)}`]) : MODES.map(m => {
         const b = bm[m];
         return [modeLabels[m], `< ${b.iniciante}`, `${b.iniciante} a ${b.desenvolvimento-1}`, `${b.desenvolvimento} a ${b.fluente-1}`, `>= ${b.fluente}`];
     });
     doc.autoTable({
         startY: y,
-        head: [['Modo', 'Pré-Leitor', 'Leitor Iniciante', 'Em Desenvolvimento', 'Leitor Fluente']],
+        head: isIncl() ? [['Modo', 'Objetivo de fluência (PPM) — Modo Adaptação/Inclusão']] : [['Modo', 'Pré-Leitor', 'Leitor Iniciante', 'Em Desenvolvimento', 'Leitor Fluente']],
         body: bandRows,
         theme: 'grid',
         styles: { fontSize: 9, halign: 'center' },
@@ -1244,7 +1301,7 @@ async function exportFullReportPDF() {
     });
     y = doc.lastAutoTable.finalY + 4;
     doc.setFontSize(8); doc.setFont("helvetica","italic"); doc.setTextColor(...GRAY);
-    doc.text("Valores em PPM. Faixas configuradas no aplicativo no momento da emissão deste relatório.", 14, y);
+    doc.text(isIncl() ? "Valores em PPM. Modo Adaptação/Inclusão ativo: classificação por objetivo único, definido pelo professor." : "Valores em PPM. Faixas configuradas no aplicativo no momento da emissão deste relatório.", 14, y);
     y += 10;
 
     doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(...SLATE);
@@ -1365,11 +1422,16 @@ async function exportFullReportPDF() {
         // Legenda das faixas, em duas colunas
         let yL = 136;
         doc.setFontSize(9); doc.setFont("helvetica", "bold");
+        if(isIncl()) {
+            doc.setTextColor(249,115,22); doc.text(`Rumo ao Objetivo: < ${goalOf(m)} PPM`, 20, yL);
+            doc.setTextColor(34,197,94);  doc.text(`Objetivo Alcançado: >= ${goalOf(m)} PPM`, 110, yL);
+        } else {
         doc.setTextColor(239,68,68);  doc.text(`Pré-Leitor: < ${bands.iniciante} PPM`, 20, yL);
         doc.setTextColor(249,115,22); doc.text(`Leitor Iniciante: ${bands.iniciante}–${bands.desenvolvimento-1} PPM`, 110, yL);
         yL += 6;
         doc.setTextColor(202,138,4);  doc.text(`Em Desenvolvimento: ${bands.desenvolvimento}–${bands.fluente-1} PPM`, 20, yL);
         doc.setTextColor(34,197,94);  doc.text(`Leitor Fluente: >= ${bands.fluente} PPM`, 110, yL);
+        }
         doc.setTextColor(0,0,0);
         yL += 8;
 
